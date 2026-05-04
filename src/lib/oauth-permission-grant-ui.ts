@@ -8,7 +8,11 @@
 export const PERMISSION_GRANT_POSTS_STORED_RECORDS_HEADING =
   "Posts / stored records";
 export const PERMISSION_GRANT_FILE_UPLOADS_HEADING = "File uploads";
-export const PERMISSION_GRANT_REMOTE_ACTIONS_HEADING = "Remote actions";
+export const PERMISSION_GRANT_REMOTE_ACTIONS_HEADING =
+  "Service API calls (RPC)";
+/** One-line explainer under the RPC heading in bundle checklists. */
+export const PERMISSION_GRANT_RPC_METHOD_EXPLAINER =
+  "RPC means the app may call specific published API methods on the service below—not arbitrary code on your account.";
 export const PERMISSION_GRANT_ACCOUNT_RELATED_HEADING = "Account-related data";
 export const PERMISSION_GRANT_IDENTITY_HEADING = "Identity / profile";
 /** Permission row with an unknown `resource` value. */
@@ -22,7 +26,7 @@ export const PERMISSION_GRANT_RECORDS_LIST_LABEL = "Records";
 /** Subheading for repo `action` tokens (verbs). */
 export const PERMISSION_GRANT_ALLOWED_VERBS_LIST_LABEL = "Allowed verbs";
 /** Subheading for RPC `lxm` names. */
-export const PERMISSION_GRANT_BACKEND_CALLS_LIST_LABEL = "Backend calls";
+export const PERMISSION_GRANT_BACKEND_CALLS_LIST_LABEL = "API operations";
 
 export interface PermissionGrantUnorderedList {
   readonly kind: "unorderedList";

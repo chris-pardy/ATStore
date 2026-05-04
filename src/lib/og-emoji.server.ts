@@ -73,6 +73,26 @@ export async function loadAppleEmojiAsset(
     let dataUrl = await fetchAppleEmojiPng(codepoints);
 
     /**
+     * Text presentation variant (VS15 `FE0E`, e.g. after U+26FA tent) isn't how Apple PNGs
+     * are keyed — assets use emoji presentation (`FE0F`) or omit the selector entirely.
+     */
+    if (!dataUrl && codepoints.includes("-fe0e")) {
+      const fe0fSwapped = codepoints.replaceAll("-fe0e", "-fe0f");
+      if (fe0fSwapped !== codepoints) {
+        dataUrl = await fetchAppleEmojiPng(fe0fSwapped);
+      }
+      if (!dataUrl) {
+        const strippedFe0e = codepoints
+          .split("-")
+          .filter((c) => c !== "fe0e")
+          .join("-");
+        if (strippedFe0e !== codepoints) {
+          dataUrl = await fetchAppleEmojiPng(strippedFe0e);
+        }
+      }
+    }
+
+    /**
      * `emoji-datasource-apple` indexes most assets by their fully-qualified codepoints
      * (including `FE0F` variation selectors). A few legacy single-codepoint glyphs like
      * `2764` (heavy black heart) live at the unqualified path. If the qualified lookup

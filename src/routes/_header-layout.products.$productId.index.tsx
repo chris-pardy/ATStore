@@ -53,6 +53,7 @@ import { DirectoryListingReviewCard } from "../components/DirectoryListingReview
 import { EcosystemCategoryCard } from "../components/EcosystemCategoryCard";
 import { HeroImage } from "../components/HeroImage";
 import { ListingOAuthScopesPopoverChip } from "../components/ListingOAuthScopesPopoverChip";
+import { listingOAuthScopesPopoverChipShouldRender } from "../components/ListingOAuthScopesPopoverChip.logic";
 import { RestrictedMarkdownContent } from "../components/restricted-markdown-content";
 import { Alert } from "../design-system/alert";
 import { Avatar } from "../design-system/avatar";
@@ -587,7 +588,11 @@ function ListingLinksRow({
   devListingSlug?: string | null;
 }) {
   const trimmedStorefront = externalUrl?.trim() ?? "";
-  const showScopesChip = trimmedStorefront.length > 0;
+  const showScopesChip =
+    trimmedStorefront.length > 0 &&
+    listingOAuthScopesPopoverChipShouldRender({
+      oauthProbe,
+    });
   if (links.length === 0 && !showScopesChip) {
     return null;
   }

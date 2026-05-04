@@ -27,11 +27,14 @@ import {
   PERMISSION_GRANT_POSTS_STORED_RECORDS_HEADING,
   PERMISSION_GRANT_RECORDS_LIST_LABEL,
   PERMISSION_GRANT_REMOTE_ACTIONS_HEADING,
+  PERMISSION_GRANT_RPC_METHOD_EXPLAINER,
   PERMISSION_GRANT_UNRECOGNIZED_ENTRY_HEADING,
 } from "./oauth-permission-grant-ui";
 import {
+  humanizeRpcAudienceForScope,
   parseIncludeScopeToken,
   parseRepoScopeForStorefront,
+  parseRpcScopeForStorefront,
 } from "./oauth-scope-include-parse";
 
 export type { PermissionGrantStructuredLine } from "./oauth-permission-grant-ui";
@@ -432,16 +435,6 @@ function splitAtprotoPermissionScopeParts(token: string): {
   };
 }
 
-function decodeScopeQueryValue(raw: string | null | undefined): string | null {
-  if (!raw?.trim()) return null;
-  const s = raw.trim();
-  try {
-    return decodeURIComponent(s);
-  } catch {
-    return s;
-  }
-}
-
 /** `app.bsky.authViewAll` → “Auth View All”. */
 function humanizeDottedIdentifiersLastSegment(id: string): string {
   const segments = id
@@ -536,33 +529,24 @@ function describeAtprotoScopeToken(token: string): string {
       return parsed.explicitActionsSorted.join(" · ");
     }
     case "rpc": {
-      const lxms = positional === null ? sp.getAll("lxm") : [positional];
-      const names = lxms.map((s) => s.trim()).filter(Boolean);
-      const aud = decodeScopeQueryValue(sp.get("aud"));
-
-      if (names.length === 0) {
-        if (aud === "*" || !aud) {
-          return "Backend API · not narrowed in token";
+      const parsedRpc = parseRpcScopeForStorefront(t);
+      if (parsedRpc === null) {
+        return `Technical scope we didn’t summarize: ${token}`;
+      }
+      const { lxmsSorted, aud } = parsedRpc;
+      if (lxmsSorted.length === 0) {
+        if (aud === "*" || aud === null) {
+          return "Backend RPC access—callable AT Protocol APIs on a delegated host when enumerated; this token doesn't list specific methods.";
         }
-        return `Backend · ${aud}`;
+        const legible = humanizeRpcAudienceForScope(aud);
+        return legible === aud
+          ? `Backend RPC constrained to ${aud}; no specific methods listed in this token.`
+          : `Backend RPC constrained to ${legible}; no methods listed in published client metadata for this OAuth scope.`;
       }
-
-      const headLxm = names[0];
-      const pretty = headLxm
-        ? humanizeDottedIdentifiersLastSegment(headLxm)
-        : "";
-      const head =
-        names.length === 1 && headLxm !== undefined && pretty !== headLxm
-          ? `${pretty} (${headLxm})`
-          : names.join(", ");
-
-      if (aud === "*" || aud === "") {
-        return `${head} · any aud`;
+      if (lxmsSorted.length === 1) {
+        return "AT Protocol RPC: the host may let this app invoke one documented API operation (listed below)—not unrestricted access to your data.";
       }
-      if (aud) {
-        return `${head} · ${aud}`;
-      }
-      return head;
+      return `AT Protocol RPC: the host may let this app invoke ${String(lxmsSorted.length)} documented API operations (listed below)—not unrestricted account access.`;
     }
     case "account": {
       const attr = (positional ?? sp.get("attr") ?? "").trim();
@@ -771,6 +755,7 @@ function linesForPermissionGrant(
 
       const out: Array<PermissionGrantStructuredLine> = [
         PERMISSION_GRANT_REMOTE_ACTIONS_HEADING,
+        PERMISSION_GRANT_RPC_METHOD_EXPLAINER,
       ];
 
       if (lxmParts.length > 0) {
@@ -781,8 +766,13 @@ function linesForPermissionGrant(
         });
       }
 
-      if (aud.length > 0) {
-        out.push(`Hosts like ${aud}.`);
+      if (aud === "*") {
+        out.push("Service audience: any delegated host (not narrowed).");
+      } else if (aud.length > 0) {
+        const legible = humanizeRpcAudienceForScope(aud);
+        out.push(
+          legible === aud ? `Service audience: ${aud}` : `Service: ${legible}`,
+        );
       }
 
       if (lxmParts.length === 0 && aud.length === 0) {

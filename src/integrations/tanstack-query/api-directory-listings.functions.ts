@@ -976,11 +976,25 @@ async function fetchStoreListingOAuthProbe(
   const oauthClientDistinctFromSummary =
     reportValue?.summary?.oauthClientScopesDistinct;
 
-  const oauthClientScopesDistinct = Array.isArray(
+  /** Ignore `[]` in persisted reports so we still parse `clientScopeRawLine` (older rows can have both). */
+  const oauthClientScopesDistinctFromSummary = Array.isArray(
     oauthClientDistinctFromSummary,
   )
-    ? oauthClientDistinctFromSummary
-    : oauthClientDistinctTokensFromPublishedScopeLine(row.clientScopeRawLine);
+    ? [
+        ...new Set(
+          oauthClientDistinctFromSummary
+            .filter(
+              (t): t is string => typeof t === "string" && t.trim().length > 0,
+            )
+            .map((t) => t.trim()),
+        ),
+      ].toSorted((a, b) => a.localeCompare(b))
+    : [];
+
+  const oauthClientScopesDistinct =
+    oauthClientScopesDistinctFromSummary.length > 0
+      ? oauthClientScopesDistinctFromSummary
+      : oauthClientDistinctTokensFromPublishedScopeLine(row.clientScopeRawLine);
 
   return {
     status: row.status,
