@@ -5,14 +5,18 @@
  * `fyi.atstore.listing.reviewReply` into `store_listing_review_replies`,
  * `fyi.atstore.listing.favorite` into `store_listing_favorites`,
  * `site.standard.publication` into `product_site_publications`,
- * `site.standard.document` into `product_site_documents`, and
- * `com.germnetwork.declaration` into `product_germ_declarations`.
+ * `site.standard.document` into `product_site_documents`,
+ * `com.germnetwork.declaration` into `product_germ_declarations`,
+ * and the five `fund.at.*` collections into the matching `fund_*` tables (read-only mirror
+ * of at.fund records — see `lib/atproto/tap-fund-*-sync.ts`).
  * Logs identity events; other record collections are skipped except `fyi.atstore.profile` (quiet).
  * Which repos and records appear is configured on the Tap *server* (indigo `cmd/tap`): set
  * `TAP_COLLECTION_FILTERS` to include `fyi.atstore.listing.detail`, `fyi.atstore.listing.review`,
  * `fyi.atstore.listing.reviewReply`, `fyi.atstore.listing.favorite`,
- * `site.standard.publication`, `site.standard.document`, `com.germnetwork.declaration`
- * (or `fyi.atstore.*` plus Standard.site and `com.germnetwork.*` filters).
+ * `site.standard.publication`, `site.standard.document`, `com.germnetwork.declaration`,
+ * `fund.at.actor.declaration`, `fund.at.funding.contribute`, `fund.at.funding.channel`,
+ * `fund.at.funding.plan`, `fund.at.graph.dependency`
+ * (or `fyi.atstore.*` plus standard.site, `com.germnetwork.*`, and `fund.at.*` collections).
  * If the server only filters `listing.detail`,
  * review / reply / favorite creates never reach
  * this WebSocket — you will see no `[record]` lines for those records. This client has no per-DID allowlist.
@@ -27,6 +31,7 @@
 import "dotenv/config";
 
 import type { IdentityEvent, RecordEvent } from "@atproto/tap";
+import type { z } from "zod";
 
 import { SimpleIndexer, Tap } from "@atproto/tap";
 import {
@@ -34,6 +39,31 @@ import {
   tryParseListingFavoriteRecord,
   upsertListingFavoriteFromTap,
 } from "#/lib/atproto/tap-favorite-sync";
+import {
+  deleteFundActorDeclarationFromTap,
+  tryParseFundActorDeclarationRecord,
+  upsertFundActorDeclarationFromTap,
+} from "#/lib/atproto/tap-fund-actor-declaration-sync";
+import {
+  deleteFundFundingChannelFromTap,
+  tryParseFundFundingChannelRecord,
+  upsertFundFundingChannelFromTap,
+} from "#/lib/atproto/tap-fund-funding-channel-sync";
+import {
+  deleteFundFundingContributeFromTap,
+  tryParseFundFundingContributeRecord,
+  upsertFundFundingContributeFromTap,
+} from "#/lib/atproto/tap-fund-funding-contribute-sync";
+import {
+  deleteFundFundingPlanFromTap,
+  tryParseFundFundingPlanRecord,
+  upsertFundFundingPlanFromTap,
+} from "#/lib/atproto/tap-fund-funding-plan-sync";
+import {
+  deleteFundGraphDependencyFromTap,
+  tryParseFundGraphDependencyRecord,
+  upsertFundGraphDependencyFromTap,
+} from "#/lib/atproto/tap-fund-graph-dependency-sync";
 import {
   deleteGermDeclarationFromTap,
   tryParseGermDeclarationRecord,
@@ -113,6 +143,90 @@ function formatRecordLog(evt: RecordEvent) {
   return `${base} live=${evt.live}`;
 }
 
+/**
+ * Per-collection plumbing for the five `fund.at.*` collections we mirror. All five share the
+ * same shape: clone → parse → upsert (or delete on tombstone). Adding a new fund collection
+ * means a single registry entry below; the dispatch loop handles cloning, first-event log,
+ * parser failure logging, and error wrapping uniformly.
+ */
+type FundParseResult<T> =
+  | { ok: true; record: T }
+  | { ok: false; reason: string; stage: string; zodError?: z.ZodError };
+
+type FundCollectionHandler<T> = {
+  /** NSID on the wire (`COLLECTION.fund...`). */
+  collection: string;
+  /** Short tag for log lines (e.g. `fund.actor.declaration`). */
+  label: string;
+  parse: (body: Record<string, unknown> | undefined) => FundParseResult<T>;
+  upsert: (input: {
+    db: Database;
+    did: string;
+    rkey: string;
+    record: T;
+    recordSource?: Record<string, unknown>;
+  }) => Promise<void>;
+  del: (input: { db: Database; did: string; rkey: string }) => Promise<void>;
+};
+
+/** Build a registry entry; the cast widens `T` to `unknown` so dispatch can hold them in one array. */
+function fundHandler<T>(
+  h: FundCollectionHandler<T>,
+): FundCollectionHandler<unknown> {
+  return h as unknown as FundCollectionHandler<unknown>;
+}
+
+async function dispatchFundRecord(
+  db: Database,
+  evt: RecordEvent,
+  h: FundCollectionHandler<unknown>,
+  firstEventSeen: Set<string>,
+): Promise<void> {
+  if (evt.action === "delete") {
+    await h.del({ db, did: evt.did, rkey: evt.rkey });
+    return;
+  }
+  if (!firstEventSeen.has(h.collection)) {
+    firstEventSeen.add(h.collection);
+    console.log(
+      `[tap] first ${h.collection} event — ensure Tap relays ${h.collection}`,
+    );
+  }
+  const raw = evt.record;
+  const body = raw === undefined ? undefined : cloneRecordForIngest(raw);
+  if (body === undefined) {
+    console.warn(
+      `[tap] ${h.label} missing record body rkey=${evt.rkey} did=${evt.did}`,
+    );
+    return;
+  }
+  const parseResult = h.parse(body);
+  if (!parseResult.ok) {
+    console.warn(
+      `[tap] skip ${h.label} rkey=${evt.rkey} did=${evt.did} stage=${parseResult.stage}: ${parseResult.reason}`,
+    );
+    if (parseResult.stage === "zod" && parseResult.zodError) {
+      console.warn("[tap] zod field errors:", parseResult.zodError.flatten());
+    }
+    return;
+  }
+  try {
+    await h.upsert({
+      db,
+      did: evt.did,
+      rkey: evt.rkey,
+      record: parseResult.record,
+      recordSource: body,
+    });
+  } catch (error) {
+    console.error(
+      `[tap] ${h.label} upsert failed rkey=${evt.rkey} did=${evt.did}`,
+      error,
+    );
+    throw error;
+  }
+}
+
 async function main() {
   if (!process.env.DATABASE_URL?.trim()) {
     console.error(
@@ -146,6 +260,11 @@ async function main() {
     COLLECTION.standardPublication,
     COLLECTION.standardDocument,
     COLLECTION.germnetworkDeclaration,
+    COLLECTION.fundActorDeclaration,
+    COLLECTION.fundFundingContribute,
+    COLLECTION.fundFundingChannel,
+    COLLECTION.fundFundingPlan,
+    COLLECTION.fundGraphDependency,
   ]);
   let firstListingDetailEvent = true;
   let firstListingReviewEvent = true;
@@ -154,6 +273,49 @@ async function main() {
   let firstStandardPublicationEvent = true;
   let firstStandardDocumentEvent = true;
   let firstGermnetworkDeclarationEvent = true;
+
+  /** Registry of `fund.at.*` collection handlers — see `dispatchFundRecord`. */
+  const fundHandlers: ReadonlyArray<FundCollectionHandler<unknown>> = [
+    fundHandler({
+      collection: COLLECTION.fundActorDeclaration,
+      label: "fund.actor.declaration",
+      parse: tryParseFundActorDeclarationRecord,
+      upsert: upsertFundActorDeclarationFromTap,
+      del: deleteFundActorDeclarationFromTap,
+    }),
+    fundHandler({
+      collection: COLLECTION.fundFundingContribute,
+      label: "fund.funding.contribute",
+      parse: tryParseFundFundingContributeRecord,
+      upsert: upsertFundFundingContributeFromTap,
+      del: deleteFundFundingContributeFromTap,
+    }),
+    fundHandler({
+      collection: COLLECTION.fundFundingChannel,
+      label: "fund.funding.channel",
+      parse: tryParseFundFundingChannelRecord,
+      upsert: upsertFundFundingChannelFromTap,
+      del: deleteFundFundingChannelFromTap,
+    }),
+    fundHandler({
+      collection: COLLECTION.fundFundingPlan,
+      label: "fund.funding.plan",
+      parse: tryParseFundFundingPlanRecord,
+      upsert: upsertFundFundingPlanFromTap,
+      del: deleteFundFundingPlanFromTap,
+    }),
+    fundHandler({
+      collection: COLLECTION.fundGraphDependency,
+      label: "fund.graph.dependency",
+      parse: tryParseFundGraphDependencyRecord,
+      upsert: upsertFundGraphDependencyFromTap,
+      del: deleteFundGraphDependencyFromTap,
+    }),
+  ];
+  const fundHandlerByCollection = new Map(
+    fundHandlers.map((h) => [h.collection, h]),
+  );
+  const fundFirstEventSeen = new Set<string>();
 
   const indexer = new SimpleIndexer();
 
@@ -182,6 +344,10 @@ async function main() {
       } else if (evt.collection.startsWith("com.germnetwork.")) {
         console.warn(
           `[tap] unexpected com.germnetwork collection (ingest ${[...ingestCollections].join(", ")}): ${evt.collection} rkey=${evt.rkey} did=${evt.did}`,
+        );
+      } else if (evt.collection.startsWith("fund.at.")) {
+        console.warn(
+          `[tap] unexpected fund.at collection (ingest ${[...ingestCollections].join(", ")}): ${evt.collection} rkey=${evt.rkey} did=${evt.did}`,
         );
       } else if (isVerbose()) {
         console.log(
@@ -609,6 +775,19 @@ async function main() {
       return;
     }
 
+    const fundHandlerForCollection = fundHandlerByCollection.get(
+      evt.collection,
+    );
+    if (fundHandlerForCollection) {
+      await dispatchFundRecord(
+        db,
+        evt,
+        fundHandlerForCollection,
+        fundFirstEventSeen,
+      );
+      return;
+    }
+
     if (evt.collection === COLLECTION.listingDetail) {
       if (evt.action !== "delete" && !evt.live) {
         console.log(
@@ -736,7 +915,7 @@ async function main() {
     `[tap] config: url=${url} ingestCollections=${[...ingestCollections].join(", ")} trustedPublishers=${trusted.size} verbose=${isVerbose()}`,
   );
   console.log(
-    `[tap] hint: Tap server TAP_COLLECTION_FILTERS must include listing.review + listing.favorite + site.standard.* + com.germnetwork.declaration (or fyi.atstore.* and Standard.site / Germ collections) or those events never arrive here`,
+    `[tap] hint: Tap server TAP_COLLECTION_FILTERS must include listing.review + listing.favorite + site.standard.* + com.germnetwork.declaration + fund.at.* (or fyi.atstore.* and Standard.site / Germ / at.fund collections) or those events never arrive here`,
   );
   console.log(
     `[tap] WebSocket channel starting (blocking) — you should see [record] lines as repos update…`,

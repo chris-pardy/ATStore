@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { scheduleFundBackfillForProductDid } from "#/lib/atproto/fund-backfill";
 import { getAtstoreRepoDid } from "#/lib/atproto/publish-directory-listing";
 import { scheduleStandardSiteBackfillForProductDid } from "#/lib/atproto/standard-site-verify-backfill";
 import { scheduleGermDeclarationBackfillForProductDid } from "#/lib/atproto/tap-germ-declaration-sync";
@@ -524,6 +525,7 @@ const setListingVerification = createServerFn({ method: "POST" })
       if (productDid?.startsWith("did:")) {
         scheduleStandardSiteBackfillForProductDid(context.db, productDid);
         scheduleGermDeclarationBackfillForProductDid(context.db, productDid);
+        scheduleFundBackfillForProductDid(context.db, productDid);
       }
     }
 
