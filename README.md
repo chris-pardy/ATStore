@@ -40,6 +40,25 @@ pnpm dev          # http://127.0.0.1:3000
 
 You only need to do this once per machine.
 
+**Docker (any OS)**
+
+The repo ships a `docker-compose.yml` that boots a Postgres 17 +
+pgvector container matching the default `.env.example` exactly — no
+local Postgres install needed:
+
+```bash
+docker compose up -d           # start Postgres in the background
+docker compose ps              # confirm it's healthy
+docker compose down            # stop (data persists in the named volume)
+docker compose down -v         # stop and wipe the volume (nukes the DB)
+```
+
+The container exposes `localhost:5432`, uses credentials
+`postgres:postgres`, creates the `at_store` database on first boot, and
+persists data in the `postgres_data` volume. `pnpm run setup` will
+connect to it as-is and run the `vector` extension + migrations against
+it.
+
 **macOS (Homebrew)**
 
 ```bash
