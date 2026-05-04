@@ -35,70 +35,24 @@ import {
   isPermissionGrantUnorderedList,
 } from "../lib/oauth-permission-grant-ui";
 import {
-  atprotoPermissionScopeResource,
   capRepoCollectionConsentLinesForUi,
   mergeRepoScopesIntoCollectionConsentLines,
   parseIncludeScopeToken,
 } from "../lib/oauth-scope-include-parse";
+import {
+  BUCKET_LABEL,
+  groupScopeHumanRows,
+  isSyntheticBaselineConsentRow,
+  listingOAuthScopesPopoverChipShouldRender,
+  oauthProbeClientListsTransitionGeneric,
+  storefrontClientScopeLensActive,
+  storefrontScopesPopoverListInputs,
+} from "./ListingOAuthScopesPopoverChip.logic";
 
 const PERMISSION_DETAIL_MAX_LINES = 12;
 
 /** Limits very long unordered lists (records, verbs, RPC names) inside one bundle section. */
 const PERMISSION_DETAIL_MAX_ITEMS_PER_ACTION_LIST = 42;
-
-/** Baseline OAuth scope token; surfaced as plain-language consent (matches typical host consent screen). */
-const BASELINE_ACCOUNT_SCOPE = "atproto";
-
-/** Parseable grouping for merged probe tokens (`repo:`, `include:…`, transitional, …). */
-type ScopeBucket =
-  | "profile"
-  | "bundle"
-  | "repo"
-  | "blob"
-  | "transitional"
-  | "other";
-
-const BUCKET_LABEL: Record<ScopeBucket, string> = {
-  profile: "Wants access to your account",
-  bundle: "Included permission bundles",
-  repo: "Manage records",
-  blob: "Files & blobs",
-  transitional: "Legacy broad access",
-  other: "Other",
-};
-
-const BUCKET_ORDER: Array<ScopeBucket> = [
-  "profile",
-  "bundle",
-  "repo",
-  "blob",
-  "transitional",
-  "other",
-];
-
-type StorefrontSyntheticBaselineConsent = SummaryScopeHumanRow & {
-  storefrontSyntheticBaselineConsent: true;
-};
-
-function isSyntheticBaselineConsentRow(row: SummaryScopeHumanRow): boolean {
-  return (
-    (
-      row as SummaryScopeHumanRow & {
-        storefrontSyntheticBaselineConsent?: boolean;
-      }
-    ).storefrontSyntheticBaselineConsent === true
-  );
-}
-
-/** Mirrors host consent wording; hides the bare `atproto` token elsewhere. */
-function baselineConsentSyntheticRow(): SummaryScopeHumanRow {
-  const row: StorefrontSyntheticBaselineConsent = {
-    token: BASELINE_ACCOUNT_SCOPE,
-    description: BUCKET_LABEL.profile,
-    storefrontSyntheticBaselineConsent: true,
-  };
-  return row;
-}
 
 const styles = stylex.create({
   bundlePanel: {
@@ -302,68 +256,6 @@ const styles = stylex.create({
     wordBreak: "break-all",
   },
 });
-
-/** Warn only when the app's published OAuth client metadata `scope` field lists `transition:generic`. */
-function oauthProbeClientListsTransitionGeneric(
-  probe: DirectoryListingOAuthProbe,
-): boolean {
-  const line = probe.clientScopeRawLine;
-  if (!line?.trim()) return false;
-  const tokens = line
-    .replaceAll("\u00A0", " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  return tokens.includes("transition:generic");
-}
-
-function scopeTokenBucket(token: string): ScopeBucket {
-  const t = token.trim();
-  if (!t) return "other";
-  if (parseIncludeScopeToken(t) !== null) return "bundle";
-  if (t === "atproto") return "profile";
-  if (t.startsWith("transition:")) return "transitional";
-  const res = atprotoPermissionScopeResource(t);
-  if (res === "repo") return "repo";
-  if (res === "blob") return "blob";
-  return "other";
-}
-
-/** Human-readable probe rows grouped for display. Empty buckets omitted. */
-function groupScopeHumanRows(
-  rows: Array<SummaryScopeHumanRow>,
-): Array<{ bucket: ScopeBucket; rows: Array<SummaryScopeHumanRow> }> {
-  const map = new Map<ScopeBucket, Array<SummaryScopeHumanRow>>();
-  for (const row of rows) {
-    const bucket = scopeTokenBucket(row.token);
-    const next = map.get(bucket) ?? [];
-    next.push(row);
-    map.set(bucket, next);
-  }
-  return BUCKET_ORDER.filter((b) => (map.get(b)?.length ?? 0) > 0).map((b) => ({
-    bucket: b,
-    rows: map.get(b) ?? [],
-  }));
-}
-
-/** Fallback when we only have loose tokens (no `scopeHumanReadable` rows). */
-function groupPlainTokens(tokens: Array<string>): Array<{
-  bucket: ScopeBucket;
-  tokens: Array<string>;
-}> {
-  const map = new Map<ScopeBucket, Array<string>>();
-  const sorted = [...tokens].toSorted((a, b) => a.localeCompare(b));
-  for (const t of sorted) {
-    const bucket = scopeTokenBucket(t);
-    const next = map.get(bucket) ?? [];
-    next.push(t);
-    map.set(bucket, next);
-  }
-  return BUCKET_ORDER.filter((b) => (map.get(b)?.length ?? 0) > 0).map((b) => ({
-    bucket: b,
-    tokens: map.get(b) ?? [],
-  }));
-}
 
 function coerceStructuredLine(
   raw: unknown,
@@ -654,34 +546,6 @@ function formatProbedAt(iso: string | null): string {
   }
 }
 
-/** Storefront prefers client_metadata tokens — merged AS catalogs only when unpublished. */
-function storefrontClientScopeLensActive(
-  probe: DirectoryListingOAuthProbe,
-): boolean {
-  return probe.oauthClientScopesDistinct.length > 0;
-}
-
-function storefrontScopeHumanReadable(
-  probe: DirectoryListingOAuthProbe,
-): Array<SummaryScopeHumanRow> {
-  if (!storefrontClientScopeLensActive(probe)) {
-    return probe.scopeHumanReadable;
-  }
-  const allow = new Set(probe.oauthClientScopesDistinct);
-  return probe.scopeHumanReadable.filter((r) => allow.has(r.token));
-}
-
-function storefrontPlainScopeTokens(
-  probe: DirectoryListingOAuthProbe,
-): Array<string> {
-  if (!storefrontClientScopeLensActive(probe)) {
-    return [
-      ...new Set([...probe.oauthScopesDistinct, ...probe.transitionalScopes]),
-    ];
-  }
-  return probe.oauthClientScopesDistinct;
-}
-
 function storefrontScopesPopoverIntro(props: {
   probe: DirectoryListingOAuthProbe | null;
 }) {
@@ -716,26 +580,9 @@ function storefrontScopesPopoverIntro(props: {
 function storefrontScopesPopoverBody(props: {
   probe: DirectoryListingOAuthProbe;
 }) {
-  const humanRaw = storefrontScopeHumanReadable(props.probe);
-  const plainRaw = storefrontPlainScopeTokens(props.probe);
-
-  const baselineRequested =
-    humanRaw.some(
-      (r) => r.token.trim().toLowerCase() === BASELINE_ACCOUNT_SCOPE,
-    ) ||
-    plainRaw.some((t) => t.trim().toLowerCase() === BASELINE_ACCOUNT_SCOPE);
-
-  const humanWithoutBaselineToken = humanRaw.filter(
-    (r) => r.token.trim().toLowerCase() !== BASELINE_ACCOUNT_SCOPE,
+  const { humansForGrouped, plainGrouped } = storefrontScopesPopoverListInputs(
+    props.probe,
   );
-  const plainWithoutBaselineToken = plainRaw.filter(
-    (t) => t.trim().toLowerCase() !== BASELINE_ACCOUNT_SCOPE,
-  );
-
-  const humansForGrouped: Array<SummaryScopeHumanRow> = [
-    ...(baselineRequested ? [baselineConsentSyntheticRow()] : []),
-    ...humanWithoutBaselineToken,
-  ];
 
   const clientLens = storefrontClientScopeLensActive(props.probe);
 
@@ -775,18 +622,6 @@ function storefrontScopesPopoverBody(props: {
         })}
       </Flex>
     );
-  }
-
-  let plainGrouped = groupPlainTokens(plainWithoutBaselineToken);
-
-  if (baselineRequested) {
-    plainGrouped = [
-      {
-        bucket: "profile",
-        tokens: [BUCKET_LABEL.profile],
-      },
-      ...plainGrouped.filter((g) => g.bucket !== "profile"),
-    ];
   }
 
   if (plainGrouped.length > 0) {
@@ -880,6 +715,14 @@ export function ListingOAuthScopesPopoverChip(props: {
   const popoverHeading = elevated
     ? "Important: very broad access"
     : "App permissions";
+
+  if (
+    !listingOAuthScopesPopoverChipShouldRender({
+      oauthProbe: props.oauthProbe,
+    })
+  ) {
+    return null;
+  }
 
   return (
     <Popover

@@ -147,8 +147,8 @@ export async function upsertStandardPublicationFromTap(input: {
   recordSource?: Record<string, unknown>;
 }) {
   if (!(await hasStoreListingForProductDid(input.db, input.did))) {
-    console.warn(
-      `[tap-standard-publication] skip — no store_listings.product_account_did=${input.did} rkey=${input.rkey}`,
+    console.log(
+      `[tap-standard-publication] skip repo=${input.did} rkey=${input.rkey} — no listing has product_account_did=this repo (link product on a listing, then standard-site backfill)`,
     );
     return;
   }

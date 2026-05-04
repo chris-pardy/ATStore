@@ -31,6 +31,8 @@
     "lex:status": "node scripts/goat-lex.mjs lex status",
     "atproto:publish-lexicons": "node scripts/goat-lex.mjs lex publish",
     "tap:consumer": "tsx -r dotenv/config scripts/tap-consumer.ts",
+    "standard-site:backfill-product": "tsx -r dotenv/config scripts/standard-site-backfill-product.ts",
+    "standard-site:backfill-all-products": "tsx -r dotenv/config scripts/standard-site-backfill-all-product-dids.ts",
     "jetstream:consumer": "tsx -r dotenv/config scripts/jetstream-consumer.ts",
     "trending:rescore": "tsx -r dotenv/config scripts/rescore-trending.ts",
     "typecheck": "tsc --noEmit",

@@ -208,8 +208,8 @@ export async function upsertStandardDocumentFromTap(input: {
   recordSource?: Record<string, unknown>;
 }) {
   if (!(await hasStoreListingForProductDid(input.db, input.did))) {
-    console.warn(
-      `[tap-standard-document] skip — no store_listings.product_account_did=${input.did} rkey=${input.rkey}`,
+    console.log(
+      `[tap-standard-document] skip repo=${input.did} rkey=${input.rkey} — no listing has product_account_did=this repo`,
     );
     return;
   }

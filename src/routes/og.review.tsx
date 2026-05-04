@@ -48,6 +48,20 @@ const EXCERPT_MAX_HEIGHT_PX = Math.round(
   EXCERPT_FONT_SIZE_PX * EXCERPT_LINE_HEIGHT * EXCERPT_MAX_LINES,
 );
 
+/** Total excerpt length cap (includes `\n` and trailing `…` when truncated). */
+const EXCERPT_MAX_CHARS = 280;
+/** Body width inside `padding: 40px 64px` on the OG frame. */
+const EXCERPT_BODY_INNER_WIDTH_PX = OG_WIDTH - 128;
+/**
+ * Approximate Inter `400` average glyph width (~0.52em) × font size vs content width so manual
+ * wraps line up with Satori at full width (avoids a short rag on the right). Slightly tight for
+ * emoji / wide glyphs; `maxHeight` + {@link clampOgReviewExcerpt} still guard overflow.
+ */
+const EXCERPT_APPROX_CHARS_PER_LINE = Math.max(
+  16,
+  Math.floor(EXCERPT_BODY_INNER_WIDTH_PX / (EXCERPT_FONT_SIZE_PX * 0.52)),
+);
+
 type FontPair = { regular: ArrayBuffer; bold: ArrayBuffer };
 let fontPromise: Promise<FontPair> | null = null;
 
@@ -77,12 +91,134 @@ function normalizeOgText(value: string) {
   return s.replaceAll(/\s+/g, " ").trim();
 }
 
+/** Trim and CRLF normalization; keeps newlines for `whiteSpace: pre-wrap` OG excerpts. */
+function normalizeOgMultilineBody(value: string) {
+  const s = typeof value === "string" ? value : String(value ?? "");
+  return s.replaceAll("\r\n", "\n").replaceAll("\r", "\n").trim();
+}
+
 function truncate(value: string, maxLength: number) {
   if (value.length <= maxLength) {
     return value;
   }
 
   return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+/**
+ * Truncate for headings / author lines: counts grapheme clusters so we never bisect emoji or
+ * ZWJ sequences (`String#slice` is UTF-16 and breaks those). Fallback matches {@link truncate}.
+ */
+function truncateGraphemeClusters(value: string, maxVisible: number): string {
+  if (maxVisible <= 0 || !value) {
+    return "";
+  }
+
+  try {
+    const IntlWithSegmenter = Intl as typeof Intl & {
+      Segmenter?: typeof Intl.Segmenter;
+    };
+    if (typeof IntlWithSegmenter.Segmenter === "function") {
+      const segmenter = new IntlWithSegmenter.Segmenter(undefined, {
+        granularity: "grapheme",
+      });
+      const segments = [...segmenter.segment(value)];
+      if (segments.length <= maxVisible) {
+        return value;
+      }
+      const head = segments
+        .slice(0, maxVisible - 1)
+        .map((s) => s.segment)
+        .join("")
+        .trimEnd();
+      return `${head}…`;
+    }
+  } catch {
+    // Fall through — older runtimes without Segmenter / invalid locale.
+  }
+
+  return truncate(value, maxVisible);
+}
+
+function wordWrapParagraph(para: string, maxCols: number): string[] {
+  const out: string[] = [];
+  const words = para.split(/\s+/).filter(Boolean);
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      out.push(current);
+      current = "";
+    }
+  };
+
+  const chunkWord = (word: string): string[] => {
+    if (word.length <= maxCols) {
+      return [word];
+    }
+    const chunks: string[] = [];
+    for (let i = 0; i < word.length; i += maxCols) {
+      chunks.push(word.slice(i, i + maxCols));
+    }
+    return chunks;
+  };
+
+  for (const word of words) {
+    for (const piece of chunkWord(word)) {
+      const candidate = current ? `${current} ${piece}` : piece;
+      if (candidate.length <= maxCols) {
+        current = candidate;
+      } else {
+        pushCurrent();
+        current = piece;
+      }
+    }
+  }
+  pushCurrent();
+  return out.length > 0 ? out : [""];
+}
+
+/** Word-wrap each segment; explicit `\n` and blank lines become separate visual rows. */
+function wordWrapMultilineBody(text: string, maxCols: number): string[] {
+  const paragraphs = text.split("\n");
+  const lines: string[] = [];
+  for (const para of paragraphs) {
+    if (para === "") {
+      lines.push("");
+      continue;
+    }
+    lines.push(...wordWrapParagraph(para, maxCols));
+  }
+  return lines;
+}
+
+/**
+ * Enforces line + character limits for the OG card. When more wrapped lines exist than allowed,
+ * or text exceeds the char cap, ends with `…` (same convention as {@link truncate}).
+ */
+function clampOgReviewExcerpt(
+  text: string,
+  maxLines: number,
+  maxCharLength: number,
+  maxCols: number,
+): string {
+  const ellipsis = "…";
+  const wrapped = wordWrapMultilineBody(text, maxCols);
+  const clippedByLines = wrapped.length > maxLines;
+  const head = clippedByLines ? wrapped.slice(0, maxLines) : wrapped;
+  let body = head.join("\n");
+
+  if (!clippedByLines) {
+    if (body.length <= maxCharLength) {
+      return body;
+    }
+    return truncate(body, maxCharLength);
+  }
+
+  while (body.length + ellipsis.length > maxCharLength && body.length > 0) {
+    body = body.slice(0, -1);
+  }
+  return `${body.trimEnd()}${ellipsis}`;
 }
 
 function formatDidShort(did: string) {
@@ -261,17 +397,24 @@ export const Route = createFileRoute("/og/review")({
 
           const listingNameRaw =
             row.listingName == null ? "" : String(row.listingName).trim();
-          const listingTitle = truncate(
+          const listingTitle = truncateGraphemeClusters(
             normalizeOgText(listingNameRaw) || "Product",
             64,
           );
 
           const reviewRaw =
             row.reviewText == null ? "" : String(row.reviewText).trim();
-          const reviewNorm = normalizeOgText(reviewRaw);
+          const reviewNorm = normalizeOgMultilineBody(reviewRaw);
           const hasWrittenReview = Boolean(reviewNorm);
           const reviewPlain = hasWrittenReview ? reviewNorm : "";
-          const excerpt = hasWrittenReview ? truncate(reviewPlain, 280) : "";
+          const excerpt = hasWrittenReview
+            ? clampOgReviewExcerpt(
+                reviewPlain,
+                EXCERPT_MAX_LINES,
+                EXCERPT_MAX_CHARS,
+                EXCERPT_APPROX_CHARS_PER_LINE,
+              )
+            : "";
 
           const ratingText = ratingFractionLabel(row.rating);
 
@@ -367,6 +510,8 @@ export const Route = createFileRoute("/og/review")({
                   <div
                     style={{
                       color: TEXT,
+                      display: "flex",
+                      flexWrap: "wrap",
                       fontSize: "46px",
                       fontWeight: 700,
                       lineHeight: 1.12,
@@ -432,6 +577,7 @@ export const Route = createFileRoute("/og/review")({
                   {hasWrittenReview ? (
                     <div
                       style={{
+                        alignSelf: "stretch",
                         color: TEXT,
                         fontSize: `${EXCERPT_FONT_SIZE_PX}px`,
                         fontWeight: 400,
@@ -439,6 +585,9 @@ export const Route = createFileRoute("/og/review")({
                         marginBottom: "28px",
                         maxHeight: `${EXCERPT_MAX_HEIGHT_PX}px`,
                         overflow: "hidden",
+                        whiteSpace: "pre-wrap",
+                        width: "100%",
+                        wordWrap: "break-word",
                       }}
                     >
                       {excerpt}
@@ -536,22 +685,26 @@ export const Route = createFileRoute("/og/review")({
                       <div
                         style={{
                           color: TEXT,
+                          display: "flex",
+                          flexWrap: "wrap",
                           fontSize: "32px",
                           fontWeight: 700,
                           marginBottom: secondaryLine ? "8px" : "0px",
                         }}
                       >
-                        {truncate(primaryLine, 52)}
+                        {truncateGraphemeClusters(primaryLine, 52)}
                       </div>
                       {secondaryLine ? (
                         <div
                           style={{
                             color: TEXT_MUTED,
+                            display: "flex",
+                            flexWrap: "wrap",
                             fontSize: "26px",
                             fontWeight: 500,
                           }}
                         >
-                          {truncate(secondaryLine, 56)}
+                          {truncateGraphemeClusters(secondaryLine, 56)}
                         </div>
                       ) : null}
                     </div>
