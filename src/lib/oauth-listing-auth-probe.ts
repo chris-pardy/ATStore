@@ -1093,6 +1093,7 @@ async function ingestOAuthClientMetadataAttemptsForOrigin(
     if (result.ok || result.status !== 404) {
       clientAttempts.push({ url: u, result, scope_field });
     }
+    if (result.ok) return;
   }
 }
 
