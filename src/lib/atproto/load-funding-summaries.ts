@@ -363,8 +363,9 @@ export async function loadFundingDetailForDid(
 
   /**
    * Sort the raw `channels` array the same way `buildChipsForDid` sorts chips so the
-   * `<FundingPanel/>` (which iterates `channels` directly) shows the contribute-matching
-   * channel first too. Plans-attached channels come next, then alphabetical.
+   * `<FundingPopoverChip/>` (which iterates `channels` directly) shows the
+   * contribute-matching channel first too. Plans-attached channels come next, then
+   * alphabetical.
    */
   const sortedChannels: Array<FundingChannelView> = [...channels].toSorted(
     (a, b) => {

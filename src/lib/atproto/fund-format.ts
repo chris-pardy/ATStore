@@ -1,8 +1,8 @@
 /**
  * Display formatters shared by the server-side funding loader (`load-funding-summaries.ts`)
- * and the product-page funding panel (`<FundingPanel/>`). Both used to carry parallel copies
- * — when at.fund ships a new payment-provider brand or frequency value, this is the only
- * place to update.
+ * and the product-page funding popover chip (`<FundingPopoverChip/>`). Both used to carry
+ * parallel copies — when at.fund ships a new payment-provider brand or frequency value,
+ * this is the only place to update.
  */
 
 /** Channel type labels per the at.fund `channelType` knownValues. */

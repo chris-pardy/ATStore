@@ -292,8 +292,9 @@ export interface DirectoryListingDetail extends DirectoryListingCard {
    */
   verificationStatus?: string;
   /**
-   * Full at.fund detail for the rich `<FundingPanel/>` on the product page. Null when the
-   * listing has no `productAccountDid` OR no `fund.at.actor.declaration` has been mirrored.
+   * Full at.fund detail for the `<FundingPopoverChip/>` on the product page. Null when
+   * the listing has no `productAccountDid` OR no `fund.at.actor.declaration` has been
+   * mirrored.
    */
   fundingDetail: FundingDetail | null;
 }
