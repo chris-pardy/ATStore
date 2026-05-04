@@ -37,6 +37,7 @@ import {
 import { resolveUrlToImageBytes } from "#/lib/atproto/resolve-image-bytes";
 import { canonicalStandardSitePostUrl } from "#/lib/atproto/standard-site-canonical-url";
 import { scheduleStandardSiteBackfillForProductDid } from "#/lib/atproto/standard-site-verify-backfill";
+import { scheduleGermDeclarationBackfillForProductDid } from "#/lib/atproto/tap-germ-declaration-sync";
 import {
   sqlReplyAuthorAllowedPredicate,
   upsertListingReviewReplyFromTap,
@@ -56,8 +57,10 @@ import {
   oauthClientDistinctTokensFromPublishedScopeLine,
   probeOAuthListingAuth,
 } from "#/lib/oauth-listing-auth-probe";
+import { resolveGermDmHrefFromRecordJson } from "#/lib/germ-network-dm";
 import { findEligibleProductClaimsForDid } from "#/lib/product-claim-eligibility";
 import { trendingScoreSortEnabled } from "#/lib/trending/config";
+import type { AtprotoSessionContext } from "#/middleware/auth";
 import {
   adminFnMiddleware,
   getAtprotoSessionForRequest,
@@ -252,6 +255,11 @@ export interface DirectoryListingDetail extends DirectoryListingCard {
   isStoreManaged: boolean;
   /** Official product Bluesky DID (`fyi.atstore.listing.detail`). */
   productAccountDid: string | null;
+  /**
+   * Grain-style Germ DM deep link (`${messageMeUrl}/web#viewerDid+subjectDid`) when the viewer
+   * may open Germ per declaration `messageMe.showButtonTo`; null otherwise.
+   */
+  germDmHref: string | null;
   /** Repo DID hosting `fyi.atstore.listing.detail` — used client-side for review-reply UX. */
   repoDid: string | null;
   /** Raw `store_listings.tagline` for owner edit forms (display tagline may fall back to description). */
@@ -550,6 +558,8 @@ export interface UserProfileReviewsPageData {
   handle: string | null;
   avatarUrl: string | null;
   reviews: Array<DirectoryUserReview>;
+  /** Grain-style Germ DM URL when mirrored declaration + viewer policy allows; null otherwise. */
+  germDmHref: string | null;
 }
 
 export interface DirectoryUserFavoriteListing {
@@ -1014,6 +1024,30 @@ async function fetchStoreListingOAuthProbe(
   };
 }
 
+async function germDmHrefForMirroredRepoDid(input: {
+  db: Database;
+  schemaMod: typeof dbSchema;
+  repoDid: string | null | undefined;
+  session: AtprotoSessionContext | undefined;
+}): Promise<string | null> {
+  const trimmed = input.repoDid?.trim();
+  if (!trimmed?.startsWith("did:")) return null;
+
+  const germ = input.schemaMod.productGermDeclarations;
+  const [row] = await input.db
+    .select({ recordJson: germ.recordJson })
+    .from(germ)
+    .where(eq(germ.repoDid, trimmed))
+    .limit(1);
+
+  return resolveGermDmHrefFromRecordJson({
+    recordJson: row?.recordJson ?? null,
+    viewerDid: input.session?.did,
+    subjectDid: trimmed,
+    client: input.session?.client,
+  });
+}
+
 const rescanListingOAuthProbeDevInput = z.object({
   listingId: z.string().uuid(),
 });
@@ -1157,6 +1191,7 @@ function toListingDetail(
   options: {
     isStoreManaged: boolean;
     oauthProbe: DirectoryListingOAuthProbe | null;
+    germDmHref: string | null;
   },
 ): DirectoryListingDetail {
   const primary = primaryCategorySlug(row.categorySlugs);
@@ -1189,6 +1224,7 @@ function toListingDetail(
     updatedAt: row.updatedAt.toISOString(),
     links: normalizeListingLinks(row.links ?? null),
     oauthProbe: options.oauthProbe,
+    germDmHref: options.germDmHref,
   };
 }
 
@@ -2350,14 +2386,23 @@ const getDirectoryListingDetail = createServerFn({ method: "GET" })
       return null;
     }
 
-    const [oauthProbe, isStoreManaged] = await Promise.all([
+    const session = await getAtprotoSessionForRequest(getRequest());
+
+    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
       fetchStoreListingOAuthProbe(row.id, context),
       computeIsStoreManaged(row),
+      germDmHrefForMirroredRepoDid({
+        db: context.db,
+        schemaMod: context.schema,
+        repoDid: row.productAccountDid,
+        session,
+      }),
     ]);
 
     return toListingDetail(row, {
       isStoreManaged,
       oauthProbe,
+      germDmHref,
     });
   });
 
@@ -2405,14 +2450,23 @@ const getDirectoryListingDetailBySlug = createServerFn({ method: "GET" })
       return null;
     }
 
-    const [oauthProbe, isStoreManaged] = await Promise.all([
+    const session = await getAtprotoSessionForRequest(getRequest());
+
+    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
       fetchStoreListingOAuthProbe(row.id, context),
       computeIsStoreManaged(row),
+      germDmHrefForMirroredRepoDid({
+        db: context.db,
+        schemaMod: context.schema,
+        repoDid: row.productAccountDid,
+        session,
+      }),
     ]);
 
     return toListingDetail(row, {
       isStoreManaged,
       oauthProbe,
+      germDmHref,
     });
   });
 
@@ -2523,15 +2577,22 @@ const getDirectoryListingDetailForOwnerEdit = createServerFn({
 
     const { verificationStatus: _removed, ...detailRow } = row;
 
-    const [oauthProbe, isStoreManaged] = await Promise.all([
+    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
       fetchStoreListingOAuthProbe(row.id, context),
       computeIsStoreManaged(row),
+      germDmHrefForMirroredRepoDid({
+        db: context.db,
+        schemaMod: context.schema,
+        repoDid: row.productAccountDid,
+        session,
+      }),
     ]);
 
     return {
       ...toListingDetail(detailRow as DirectoryListingDetailRow, {
         isStoreManaged,
         oauthProbe,
+        germDmHref,
       }),
       verificationStatus: row.verificationStatus,
     };
@@ -2875,30 +2936,45 @@ const getUserProfileReviewsPageData = createServerFn({ method: "GET" })
 
     const rev = context.schema.storeListingReviews;
     const list = context.schema.storeListings;
+    const germDec = context.schema.productGermDeclarations;
 
-    const rows = await context.db
-      .select({
-        id: rev.id,
-        authorDid: rev.authorDid,
-        rating: rev.rating,
-        text: rev.text,
-        reviewCreatedAt: rev.reviewCreatedAt,
-        authorDisplayName: rev.authorDisplayName,
-        authorAvatarUrl: rev.authorAvatarUrl,
-        replyCount: rev.replyCount,
-        listingId: list.id,
-        listingName: list.name,
-        listingSlug: list.slug,
-        listingSourceUrl: list.sourceUrl,
-        listingIconUrl: list.iconUrl,
-        listingTagline: list.tagline,
-        listingRepoDid: list.repoDid,
-        listingProductAccountDid: list.productAccountDid,
-      })
-      .from(rev)
-      .innerJoin(list, eq(rev.storeListingId, list.id))
-      .where(and(eq(rev.authorDid, did), listingPublicWhere(list)))
-      .orderBy(desc(rev.reviewCreatedAt));
+    const [rows, germRow] = await Promise.all([
+      context.db
+        .select({
+          id: rev.id,
+          authorDid: rev.authorDid,
+          rating: rev.rating,
+          text: rev.text,
+          reviewCreatedAt: rev.reviewCreatedAt,
+          authorDisplayName: rev.authorDisplayName,
+          authorAvatarUrl: rev.authorAvatarUrl,
+          replyCount: rev.replyCount,
+          listingId: list.id,
+          listingName: list.name,
+          listingSlug: list.slug,
+          listingSourceUrl: list.sourceUrl,
+          listingIconUrl: list.iconUrl,
+          listingTagline: list.tagline,
+          listingRepoDid: list.repoDid,
+          listingProductAccountDid: list.productAccountDid,
+        })
+        .from(rev)
+        .innerJoin(list, eq(rev.storeListingId, list.id))
+        .where(and(eq(rev.authorDid, did), listingPublicWhere(list)))
+        .orderBy(desc(rev.reviewCreatedAt)),
+      context.db
+        .select({ recordJson: germDec.recordJson })
+        .from(germDec)
+        .where(eq(germDec.repoDid, did))
+        .limit(1),
+    ]);
+
+    const germDmHref = await resolveGermDmHrefFromRecordJson({
+      recordJson: germRow[0]?.recordJson ?? null,
+      viewerDid: session?.did,
+      subjectDid: did,
+      client: session?.client,
+    });
 
     const enriched: Array<DirectoryUserReview> = rows.map((row) => {
       const displayName =
@@ -2958,6 +3034,7 @@ const getUserProfileReviewsPageData = createServerFn({ method: "GET" })
         enriched[0]?.authorAvatarUrl?.trim() ||
         null,
       reviews: enriched,
+      germDmHref,
     } satisfies UserProfileReviewsPageData;
   });
 
@@ -5761,6 +5838,7 @@ const claimProductListingToPds = createServerFn({ method: "POST" })
         .where(eq(t.id, full.id));
 
       scheduleStandardSiteBackfillForProductDid(context.db, session.did);
+      scheduleGermDeclarationBackfillForProductDid(context.db, session.did);
 
       return { slug: inheritedSlug };
     } catch (error) {

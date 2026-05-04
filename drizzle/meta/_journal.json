@@ -246,6 +246,13 @@
       "when": 1778600000000,
       "tag": "0035_product_site_documents_cover_image",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1778700000000,
+      "tag": "0036_product_germ_declarations",
+      "breakpoints": true
     }
   ]
 }

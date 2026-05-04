@@ -15,6 +15,11 @@ export const STANDARD_SITE_NSID = {
   publication: "site.standard.publication",
 } as const;
 
+/** Germ Network (encrypted DM declaration on actor repos). */
+export const GERMNETWORK_NSID = {
+  declaration: "com.germnetwork.declaration",
+} as const;
+
 export const COLLECTION = {
   authBasic: NSID.authBasic,
   profile: NSID.profile,
@@ -25,4 +30,5 @@ export const COLLECTION = {
   lexiconSchema: NSID.lexiconSchema,
   standardDocument: STANDARD_SITE_NSID.document,
   standardPublication: STANDARD_SITE_NSID.publication,
+  germnetworkDeclaration: GERMNETWORK_NSID.declaration,
 } as const;
