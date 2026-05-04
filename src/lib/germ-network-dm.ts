@@ -26,7 +26,10 @@ export function extractGermMessageMe(
   return { messageMeUrl, showButtonTo };
 }
 
-/** Matches Grain: `${messageMeUrl}/web#${viewerDid}+${subjectDid}` */
+/**
+ * Germ spec: fragment is `[profile/messagee DID]+[viewer's DID]` (see Germ AppView guidance).
+ * Path may include a platform segment before `#`, e.g. `.../web#subjectDid+viewerDid`.
+ */
 export function buildGermWebDmHref(
   messageMeUrl: string,
   viewerDid: string,
@@ -35,7 +38,7 @@ export function buildGermWebDmHref(
   const base = messageMeUrl.trim().replace(/\/+$/, "");
   const v = viewerDid.trim();
   const s = subjectDid.trim();
-  return `${base}/web#${v}+${s}`;
+  return `${base}/web#${s}+${v}`;
 }
 
 type GetProfileResponse = {
@@ -75,7 +78,7 @@ async function profileActorFollowsViewer(
 
 /**
  * Grain visibility rules (`social.grain` / declaration lexicon semantics):
- * - Own DID: always show when `messageMe` exists and viewer is logged in.
+ * - Same DID as viewer: do not show — the fragment would be `did+did` (same twice) and Germ treats that as a self-DM.
  * - `everyone`: show.
  * - `usersIFollow`: show when the subject follows the viewer (`viewer.followedBy` on profile).
  */
@@ -88,7 +91,7 @@ async function shouldShowGermDmButton(opts: {
   const viewerDid = opts.viewerDid.trim();
   const subjectDid = opts.subjectDid.trim();
 
-  if (viewerDid === subjectDid) return true;
+  if (viewerDid === subjectDid) return false;
 
   const policy = opts.showButtonTo.trim();
   if (policy === "everyone") return true;

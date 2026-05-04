@@ -75,7 +75,7 @@ export function GermNetworkBadge({
   href,
   size: sizeProp = "sm",
 }: {
-  /** Grain-style deep link: `${messageMeUrl}/web#viewerDid+subjectDid` */
+  /** Germ deep link: `${messageMeUrl}/web#[profileDid]+[viewerDid]` */
   href: string;
   size?: "sm" | "md";
 }) {

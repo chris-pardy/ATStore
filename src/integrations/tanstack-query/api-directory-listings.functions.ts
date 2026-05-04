@@ -256,7 +256,7 @@ export interface DirectoryListingDetail extends DirectoryListingCard {
   /** Official product Bluesky DID (`fyi.atstore.listing.detail`). */
   productAccountDid: string | null;
   /**
-   * Grain-style Germ DM deep link (`${messageMeUrl}/web#viewerDid+subjectDid`) when the viewer
+   * Germ DM deep link (`${messageMeUrl}/web#profileDid+viewerDid` per Germ AppView docs) when the viewer
    * may open Germ per declaration `messageMe.showButtonTo`; null otherwise.
    */
   germDmHref: string | null;
@@ -558,7 +558,7 @@ export interface UserProfileReviewsPageData {
   handle: string | null;
   avatarUrl: string | null;
   reviews: Array<DirectoryUserReview>;
-  /** Grain-style Germ DM URL when mirrored declaration + viewer policy allows; null otherwise. */
+  /** Germ DM URL when mirrored declaration + viewer policy allows; null otherwise. */
   germDmHref: string | null;
 }
 
