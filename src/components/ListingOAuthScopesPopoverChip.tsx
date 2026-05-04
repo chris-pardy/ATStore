@@ -36,8 +36,10 @@ import {
 } from "../lib/oauth-permission-grant-ui";
 import {
   capRepoCollectionConsentLinesForUi,
+  humanizeRpcAudienceForScope,
   mergeRepoScopesIntoCollectionConsentLines,
   parseIncludeScopeToken,
+  parseRpcScopeForStorefront,
 } from "../lib/oauth-scope-include-parse";
 import {
   BUCKET_LABEL,
@@ -420,6 +422,54 @@ function CompactScopeHumanRow({ row }: { row: SummaryScopeHumanRow }) {
   const detail = resolved?.detail?.trim() ? resolved.detail.trim() : null;
 
   if (!isBundleRow) {
+    const rpcStandalone = parseRpcScopeForStorefront(row.token.trim());
+    if (rpcStandalone) {
+      const methodItems =
+        rpcStandalone.lxmsSorted.length > 0
+          ? unorderedListDisplayItems([...rpcStandalone.lxmsSorted])
+          : [];
+      let serviceLine: string | null = null;
+      const { aud } = rpcStandalone;
+      if (aud === "*") {
+        serviceLine =
+          "Service audience: Any delegated Bluesky service (not narrowed to one host DID).";
+      } else if (aud?.trim()) {
+        const nice = humanizeRpcAudienceForScope(aud);
+        serviceLine =
+          nice === aud ? `Service audience: ${aud}` : `Service: ${nice}`;
+      }
+
+      return (
+        <li>
+          <Flex direction="column" gap="lg" style={styles.scopeRowInner}>
+            {serviceLine === null ? null : (
+              <SmallBody variant="secondary">{serviceLine}</SmallBody>
+            )}
+            {methodItems.length > 0 ? (
+              <Flex direction="column" gap="sm">
+                <Text size="xs" weight="semibold" variant="secondary">
+                  Can Access:
+                </Text>
+                <ul {...stylex.props(styles.bundleNestedList)}>
+                  {methodItems.map((entry, ix) => (
+                    <li key={`rpc-lxm-${entry.slice(0, 48)}-${String(ix)}`}>
+                      <Text
+                        size="xs"
+                        variant="secondary"
+                        style={styles.bundleNestedItemText}
+                      >
+                        {entry}
+                      </Text>
+                    </li>
+                  ))}
+                </ul>
+              </Flex>
+            ) : null}
+          </Flex>
+        </li>
+      );
+    }
+
     return (
       <li>
         <Flex direction="column" gap="lg" style={styles.scopeRowInner}>

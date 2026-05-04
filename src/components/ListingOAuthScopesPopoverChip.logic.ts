@@ -14,6 +14,7 @@ type ScopeBucket =
   | "bundle"
   | "repo"
   | "blob"
+  | "api"
   | "transitional"
   | "other";
 
@@ -22,6 +23,7 @@ export const BUCKET_LABEL: Record<ScopeBucket, string> = {
   bundle: "Included permission bundles",
   repo: "Manage records",
   blob: "Files & blobs",
+  api: "API",
   transitional: "Legacy broad access",
   other: "Other",
 };
@@ -31,6 +33,7 @@ const BUCKET_ORDER: Array<ScopeBucket> = [
   "bundle",
   "repo",
   "blob",
+  "api",
   "transitional",
   "other",
 ];
@@ -84,6 +87,7 @@ function scopeTokenBucket(token: string): ScopeBucket {
   const res = atprotoPermissionScopeResource(t);
   if (res === "repo") return "repo";
   if (res === "blob") return "blob";
+  if (res === "rpc") return "api";
   return "other";
 }
 

@@ -196,6 +196,70 @@ export function mergeRepoScopesIntoCollectionConsentLines(
   return lines;
 }
 
+export interface RpcScopeParsedForUi {
+  /** Sorted distinct `lxm` NSIDs */
+  readonly lxmsSorted: ReadonlyArray<string>;
+  /** Decoded service audience DID (may be `"*"` or empty when absent) */
+  readonly aud: string | null;
+}
+
+/**
+ * Parses `rpc?lxm=…&aud=…` (and `rpc:positional?…`) for storefront UI.
+ * Returns `null` when the token is not an `rpc` permission scope.
+ */
+export function parseRpcScopeForStorefront(
+  token: string,
+): RpcScopeParsedForUi | null {
+  if (atprotoPermissionScopeResource(token) !== "rpc") {
+    return null;
+  }
+
+  const trimmed = token.trim();
+  const qIdx = trimmed.indexOf("?");
+  const qs = qIdx === -1 ? "" : trimmed.slice(qIdx + 1);
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(qs);
+  } catch {
+    params = new URLSearchParams();
+  }
+
+  const beforeParams = qIdx === -1 ? trimmed : trimmed.slice(0, qIdx);
+  const colonIdx = beforeParams.indexOf(":");
+  const positionalRaw =
+    colonIdx === -1 ? null : beforeParams.slice(colonIdx + 1).trim();
+  const positional =
+    positionalRaw !== null && positionalRaw.length > 0 ? positionalRaw : null;
+
+  const fromQuery = params.getAll("lxm");
+  const lxmsRaw = positional === null ? fromQuery : [positional, ...fromQuery];
+  const lxmsSorted = [
+    ...new Set(lxmsRaw.map((s) => s.trim()).filter(Boolean)),
+  ].toSorted((a, b) => a.localeCompare(b));
+
+  const audRaw = params.get("aud");
+  const aud = audRaw?.trim()
+    ? decodeUriComponentSafely(audRaw.trim()).trim()
+    : null;
+
+  return { lxmsSorted, aud };
+}
+
+/** Short label for known `rpc` audiences; falls back to the raw string. */
+export function humanizeRpcAudienceForScope(aud: string): string {
+  const t = aud.trim();
+  if (!t || t === "*") {
+    return t;
+  }
+  if (
+    t === "did:web:api.bsky.app#bsky_appview" ||
+    t.startsWith("did:web:api.bsky.app#")
+  ) {
+    return "Bluesky official API (Appview)";
+  }
+  return t;
+}
+
 export function capRepoCollectionConsentLinesForUi(
   lines: ReadonlyArray<RepoCollectionConsentLine>,
 ): {
