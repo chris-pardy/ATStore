@@ -2,6 +2,7 @@ import type { Database } from "#/db/index.server";
 import type { StoreListing } from "#/db/schema";
 import type { ListingLink } from "#/lib/atproto/listing-record";
 import type { SummaryScopeHumanRow } from "#/lib/oauth-listing-auth-probe";
+import type { AtprotoSessionContext } from "#/middleware/auth";
 import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
@@ -49,6 +50,7 @@ import {
   resolveBlueskyHandleToDid,
 } from "#/lib/bluesky-public-profile";
 import { bskyAppPostUrlFromAtUri } from "#/lib/bsky-app-urls";
+import { resolveGermDmHrefFromRecordJson } from "#/lib/germ-network-dm";
 import {
   httpsListingImageUrlOrNull,
   publicMediaUrlOrNull,
@@ -57,10 +59,8 @@ import {
   oauthClientDistinctTokensFromPublishedScopeLine,
   probeOAuthListingAuth,
 } from "#/lib/oauth-listing-auth-probe";
-import { resolveGermDmHrefFromRecordJson } from "#/lib/germ-network-dm";
 import { findEligibleProductClaimsForDid } from "#/lib/product-claim-eligibility";
 import { trendingScoreSortEnabled } from "#/lib/trending/config";
-import type { AtprotoSessionContext } from "#/middleware/auth";
 import {
   adminFnMiddleware,
   getAtprotoSessionForRequest,

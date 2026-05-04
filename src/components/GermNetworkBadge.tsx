@@ -14,22 +14,23 @@ import { Link as AriaLink } from "react-aria-components";
 
 const styles = stylex.create({
   chip: {
+    borderColor: uiColor.border1,
+    borderRadius: radius.full,
+    borderStyle: "solid",
+    borderWidth: 1,
+    gap: gap.sm,
+    textDecoration: "none",
     alignItems: "center",
     backgroundColor: {
       default: uiColor.component1,
       ":hover": uiColor.component2,
     },
-    borderColor: uiColor.border1,
-    borderRadius: radius.full,
-    borderStyle: "solid",
-    borderWidth: 1,
     boxSizing: "border-box",
     color: uiColor.text2,
     cursor: "pointer",
     display: "inline-flex",
     flexShrink: 0,
     fontFamily: fontFamily.mono,
-    gap: gap.sm,
     outlineColor: {
       ":focus-visible": uiColor.border2,
     },
@@ -46,7 +47,6 @@ const styles = stylex.create({
     paddingLeft: horizontalSpace.lg,
     paddingRight: horizontalSpace.xl,
     paddingTop: verticalSpace.sm,
-    textDecoration: "none",
   },
   chipMd: {
     fontSize: fontSize.base,

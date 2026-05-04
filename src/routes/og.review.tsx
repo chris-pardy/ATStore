@@ -140,8 +140,8 @@ function truncateGraphemeClusters(value: string, maxVisible: number): string {
   return truncate(value, maxVisible);
 }
 
-function wordWrapParagraph(para: string, maxCols: number): string[] {
-  const out: string[] = [];
+function wordWrapParagraph(para: string, maxCols: number): Array<string> {
+  const out: Array<string> = [];
   const words = para.split(/\s+/).filter(Boolean);
   let current = "";
 
@@ -152,11 +152,11 @@ function wordWrapParagraph(para: string, maxCols: number): string[] {
     }
   };
 
-  const chunkWord = (word: string): string[] => {
+  const chunkWord = (word: string): Array<string> => {
     if (word.length <= maxCols) {
       return [word];
     }
-    const chunks: string[] = [];
+    const chunks: Array<string> = [];
     for (let i = 0; i < word.length; i += maxCols) {
       chunks.push(word.slice(i, i + maxCols));
     }
@@ -179,9 +179,9 @@ function wordWrapParagraph(para: string, maxCols: number): string[] {
 }
 
 /** Word-wrap each segment; explicit `\n` and blank lines become separate visual rows. */
-function wordWrapMultilineBody(text: string, maxCols: number): string[] {
+function wordWrapMultilineBody(text: string, maxCols: number): Array<string> {
   const paragraphs = text.split("\n");
-  const lines: string[] = [];
+  const lines: Array<string> = [];
   for (const para of paragraphs) {
     if (para === "") {
       lines.push("");
