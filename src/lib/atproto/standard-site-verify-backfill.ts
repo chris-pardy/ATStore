@@ -1,5 +1,9 @@
 import type { Database } from "#/db/index.server";
 
+import {
+  paginateListRecords,
+  rkeyFromCollectionAtUri,
+} from "#/lib/atproto/list-records";
 import { COLLECTION } from "#/lib/atproto/nsids";
 import { resolveAtprotoPdsBaseUrl } from "#/lib/atproto/resolve-atproto-pds";
 import {
@@ -10,54 +14,6 @@ import {
   tryParseStandardPublicationRecord,
   upsertStandardPublicationIntoDb,
 } from "#/lib/atproto/tap-standard-publication-sync";
-
-type ListRecordRow = { uri: string; value: unknown };
-
-function rkeyFromCollectionAtUri(
-  uri: string,
-  collection: string,
-): string | null {
-  const withoutAt = uri.replace(/^at:\/\//, "");
-  const needle = `/${collection}/`;
-  const idx = withoutAt.indexOf(needle);
-  if (idx === -1) return null;
-  const rkey = withoutAt.slice(idx + needle.length);
-  if (rkey.length === 0 || rkey.includes("/")) return null;
-  return rkey;
-}
-
-async function* paginateListRecords(
-  pdsBase: string,
-  repo: string,
-  collection: string,
-): AsyncGenerator<ListRecordRow, void, undefined> {
-  let cursor: string | undefined;
-  do {
-    const u = new URL("/xrpc/com.atproto.repo.listRecords", `${pdsBase}/`);
-    u.searchParams.set("repo", repo);
-    u.searchParams.set("collection", collection);
-    u.searchParams.set("limit", "100");
-    if (cursor) u.searchParams.set("cursor", cursor);
-    const res = await fetch(u.toString(), {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(
-        `listRecords ${collection} failed ${res.status}: ${text.slice(0, 500)}`,
-      );
-    }
-    const data = (await res.json()) as {
-      records?: Array<{ uri: string; value: unknown }>;
-      cursor?: string;
-    };
-    const records = data.records ?? [];
-    for (const rec of records) {
-      yield { uri: rec.uri, value: rec.value };
-    }
-    cursor = data.cursor;
-  } while (cursor);
-}
 
 export async function backfillStandardSiteForProductDid(
   db: Database,

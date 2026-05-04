@@ -402,6 +402,197 @@ export const productGermDeclarations = pgTable(
 );
 
 /**
+ * Tap / backfill mirror of `fund.at.actor.declaration` (singleton; key=literal:self) for product
+ * repos. The mere existence of the row signals the steward participates in at.fund —
+ * `entityType` and `role` are optional enrichment per the spec.
+ */
+export const fundActorDeclarations = pgTable(
+  "fund_actor_declarations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    /** `fund.at.actor.declaration#entityType` knownValues: individual, group, collective, organisation, other. */
+    entityType: text("entity_type"),
+    /** `fund.at.actor.declaration#role` knownValues: owner, steward, maintainer, contributor, sponsor, other. */
+    role: text("role"),
+    recordCreatedAt: timestamp("record_created_at", { withTimezone: true }),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("fund_actor_declarations_at_uri_idx").on(table.atUri),
+    /** Singleton: literal:self → only ever one row per repo. */
+    repoDidIdx: uniqueIndex("fund_actor_declarations_repo_did_idx").on(
+      table.repoDid,
+    ),
+  }),
+);
+
+/**
+ * Tap / backfill mirror of `fund.at.funding.contribute` (singleton; key=literal:self) — the
+ * canonical "Fund" URL for a steward. One row per repo.
+ */
+export const fundFundingContributes = pgTable(
+  "fund_funding_contributes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    url: text("url").notNull(),
+    label: text("label"),
+    recordCreatedAt: timestamp("record_created_at", { withTimezone: true }),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("fund_funding_contributes_at_uri_idx").on(
+      table.atUri,
+    ),
+    repoDidIdx: uniqueIndex("fund_funding_contributes_repo_did_idx").on(
+      table.repoDid,
+    ),
+  }),
+);
+
+/**
+ * Tap / backfill mirror of `fund.at.funding.channel` (key=any; rkey IS the slug). A repo may
+ * publish multiple channels (one per payment endpoint).
+ */
+export const fundFundingChannels = pgTable(
+  "fund_funding_channels",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    /** Channel slug — lexicon `key: "any"` makes the rkey the slug. */
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    /** `fund.at.funding.channel#channelType` knownValues: payment-provider, bank, cheque, cash, other. */
+    channelType: text("channel_type").notNull(),
+    /** Optional payment URI — bank/cheque channels may omit a public URL. */
+    channelUri: text("channel_uri"),
+    description: text("description"),
+    recordCreatedAt: timestamp("record_created_at", { withTimezone: true }),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("fund_funding_channels_at_uri_idx").on(table.atUri),
+    repoRkeyIdx: uniqueIndex("fund_funding_channels_repo_did_rkey_idx").on(
+      table.repoDid,
+      table.rkey,
+    ),
+    repoDidIdx: index("fund_funding_channels_repo_did_idx").on(table.repoDid),
+    channelTypeIdx: index("fund_funding_channels_channel_type_idx").on(
+      table.channelType,
+    ),
+  }),
+);
+
+/**
+ * Tap / backfill mirror of `fund.at.funding.plan` (key=any; rkey IS the slug). Plans reference
+ * channels by AT URI (`channelAtUris`) so a plan may point at channels in any account.
+ * `amount` is the smallest currency unit (e.g. cents) per spec; `0` means "any amount".
+ */
+export const fundFundingPlans = pgTable(
+  "fund_funding_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    /** `fund.at.funding.plan#status` knownValues: active, inactive. */
+    status: text("status"),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** Smallest currency unit (cents for USD). `0` = any amount. Stored as bigint to allow large amounts. */
+    amount: bigint("amount", { mode: "bigint" }),
+    /** ISO 4217 code, max 3 chars. */
+    currency: text("currency"),
+    /** `fund.at.funding.plan#frequency` knownValues: one-time, weekly, fortnightly, monthly, yearly, other. */
+    frequency: text("frequency"),
+    /** AT URIs of `fund.at.funding.channel` records this plan can be fulfilled through. */
+    channelAtUris: text("channel_at_uris").array(),
+    recordCreatedAt: timestamp("record_created_at", { withTimezone: true }),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("fund_funding_plans_at_uri_idx").on(table.atUri),
+    repoRkeyIdx: uniqueIndex("fund_funding_plans_repo_did_rkey_idx").on(
+      table.repoDid,
+      table.rkey,
+    ),
+    repoDidIdx: index("fund_funding_plans_repo_did_idx").on(table.repoDid),
+    statusIdx: index("fund_funding_plans_status_idx").on(table.status),
+  }),
+);
+
+/**
+ * Tap / backfill mirror of `fund.at.graph.dependency`. The author (`repoDid`) declares they
+ * depend on `subjectDid`. Indexed both ways so we can answer "who does X depend on" and
+ * "who depends on Y".
+ */
+export const fundGraphDependencies = pgTable(
+  "fund_graph_dependencies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    /** `fund.at.graph.dependency#subject` — DID (did:plc:..., did:web:...). */
+    subjectDid: text("subject_did").notNull(),
+    label: text("label"),
+    recordCreatedAt: timestamp("record_created_at", { withTimezone: true }),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("fund_graph_dependencies_at_uri_idx").on(table.atUri),
+    repoRkeyIdx: uniqueIndex("fund_graph_dependencies_repo_did_rkey_idx").on(
+      table.repoDid,
+      table.rkey,
+    ),
+    repoDidIdx: index("fund_graph_dependencies_repo_did_idx").on(table.repoDid),
+    subjectDidIdx: index("fund_graph_dependencies_subject_did_idx").on(
+      table.subjectDid,
+    ),
+  }),
+);
+
+/**
  * Append-only moderation log: each row is one admin rejection with a human-readable reason.
  * Not touched by Tap ingest. Cleared from the active UX by moving status off `rejected`, not by DELETE.
  */

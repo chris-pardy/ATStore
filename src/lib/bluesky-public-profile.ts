@@ -23,26 +23,87 @@ export async function fetchBlueskyPublicProfileFields(
       headers: { Accept: "application/json" },
     });
     if (!response.ok) return null;
-    const profileData = (await response.json()) as {
-      handle?: string | null;
-      displayName?: string | null;
-      avatar?: string | null;
-    };
-    const handle = profileData.handle?.trim();
-    const displayName = profileData.displayName?.trim();
-    const rawAvatar = profileData.avatar;
-    const avatarUrl =
-      typeof rawAvatar === "string" && rawAvatar.trim() !== ""
-        ? rawAvatar.trim()
-        : null;
-    return {
-      handle: handle && handle.length > 0 ? handle : null,
-      displayName: displayName && displayName.length > 0 ? displayName : null,
-      avatarUrl,
-    };
+    return normalizeProfileResponse(await response.json());
   } catch {
     return null;
   }
+}
+
+/** `app.bsky.actor.getProfiles` accepts up to 25 actors per call (server-side cap). */
+const GET_PROFILES_BATCH_SIZE = 25;
+
+function normalizeProfileResponse(raw: unknown): BlueskyPublicProfileFields {
+  const profileData = raw as {
+    handle?: string | null;
+    displayName?: string | null;
+    avatar?: string | null;
+  };
+  const handle = profileData.handle?.trim();
+  const displayName = profileData.displayName?.trim();
+  const rawAvatar = profileData.avatar;
+  const avatarUrl =
+    typeof rawAvatar === "string" && rawAvatar.trim() !== ""
+      ? rawAvatar.trim()
+      : null;
+  return {
+    handle: handle && handle.length > 0 ? handle : null,
+    displayName: displayName && displayName.length > 0 ? displayName : null,
+    avatarUrl,
+  };
+}
+
+/**
+ * Batched variant of `fetchBlueskyPublicProfileFields` — calls `app.bsky.actor.getProfiles`
+ * (max 25 actors per call) and returns a Map keyed by the DID *we requested*. Listings whose
+ * DIDs the API can't resolve map to `null` (matches the per-DID function's contract). On a
+ * batch HTTP failure every DID in that batch maps to `null` so callers don't need a
+ * second null-check path.
+ *
+ * The Map shape mirrors the per-request `Map<did, profile>` memo we use for review/mention
+ * loaders — callers can drop this in wherever they previously built that map by hand.
+ */
+export async function fetchBlueskyPublicProfilesBatch(
+  rawDids: ReadonlyArray<string>,
+): Promise<Map<string, BlueskyPublicProfileFields | null>> {
+  const out = new Map<string, BlueskyPublicProfileFields | null>();
+  const dids = [
+    ...new Set(
+      rawDids
+        .map((d) => d?.trim())
+        .filter((d): d is string => Boolean(d) && d.startsWith("did:")),
+    ),
+  ];
+  if (dids.length === 0) return out;
+
+  // Pre-seed null so a missing DID in the API response still resolves to null below.
+  for (const did of dids) out.set(did, null);
+
+  for (let i = 0; i < dids.length; i += GET_PROFILES_BATCH_SIZE) {
+    const chunk = dids.slice(i, i + GET_PROFILES_BATCH_SIZE);
+    try {
+      const url = new URL(
+        "xrpc/app.bsky.actor.getProfiles",
+        "https://public.api.bsky.app",
+      );
+      for (const did of chunk) url.searchParams.append("actors", did);
+      const response = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) continue;
+      const data = (await response.json()) as {
+        profiles?: Array<{ did?: string } & Record<string, unknown>>;
+      };
+      for (const profile of data.profiles ?? []) {
+        const profileDid = (profile.did ?? "").trim();
+        if (!profileDid) continue;
+        out.set(profileDid, normalizeProfileResponse(profile));
+      }
+    } catch {
+      // Whole batch fell over — leave the pre-seeded `null`s in place.
+      continue;
+    }
+  }
+  return out;
 }
 
 /**

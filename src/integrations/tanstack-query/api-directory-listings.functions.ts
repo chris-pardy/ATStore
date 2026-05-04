@@ -1,6 +1,7 @@
 import type { Database } from "#/db/index.server";
 import type { StoreListing } from "#/db/schema";
 import type { ListingLink } from "#/lib/atproto/listing-record";
+import type { FundingDetail } from "#/lib/atproto/load-funding-summaries";
 import type { SummaryScopeHumanRow } from "#/lib/oauth-listing-auth-probe";
 import type { AtprotoSessionContext } from "#/middleware/auth";
 import type { SQL } from "drizzle-orm";
@@ -11,6 +12,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import * as dbSchema from "#/db/schema";
 import { parseAtUriParts } from "#/lib/atproto/at-uri";
+import { scheduleFundBackfillForProductDid } from "#/lib/atproto/fund-backfill";
 import {
   LISTING_LINK_LABEL_MAX_LENGTH,
   LISTING_LINK_MAX_COUNT,
@@ -18,6 +20,7 @@ import {
   buildListingDetailRecordWithBlobs,
   normalizeListingLinks,
 } from "#/lib/atproto/listing-record";
+import { loadFundingDetailForDid } from "#/lib/atproto/load-funding-summaries";
 import { COLLECTION, NSID } from "#/lib/atproto/nsids";
 import {
   createAtstorePublishClient,
@@ -288,6 +291,12 @@ export interface DirectoryListingDetail extends DirectoryListingCard {
    * `verification_status` for routing (e.g. back to Manage when not live).
    */
   verificationStatus?: string;
+  /**
+   * Full at.fund detail for the `<FundingPopoverChip/>` on the product page. Null when
+   * the listing has no `productAccountDid` OR no `fund.at.actor.declaration` has been
+   * mirrored.
+   */
+  fundingDetail: FundingDetail | null;
 }
 
 /** Public-safe snapshot from `store_listing_oauth_probes` (+ optional human-readable scopes from report). */
@@ -1192,10 +1201,13 @@ function toListingDetail(
     isStoreManaged: boolean;
     oauthProbe: DirectoryListingOAuthProbe | null;
     germDmHref: string | null;
+    /** at.fund full panel — hydrated by the detail handler via `loadFundingDetailForDid`. */
+    fundingDetail?: FundingDetail | null;
   },
 ): DirectoryListingDetail {
   const primary = primaryCategorySlug(row.categorySlugs);
   const assignedCategory = getDirectoryCategoryOption(primary);
+  const fundingDetail = options.fundingDetail ?? null;
 
   return {
     ...toListingCard(row),
@@ -1225,6 +1237,7 @@ function toListingDetail(
     links: normalizeListingLinks(row.links ?? null),
     oauthProbe: options.oauthProbe,
     germDmHref: options.germDmHref,
+    fundingDetail,
   };
 }
 
@@ -2388,21 +2401,24 @@ const getDirectoryListingDetail = createServerFn({ method: "GET" })
 
     const session = await getAtprotoSessionForRequest(getRequest());
 
-    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
-      fetchStoreListingOAuthProbe(row.id, context),
-      computeIsStoreManaged(row),
-      germDmHrefForMirroredRepoDid({
-        db: context.db,
-        schemaMod: context.schema,
-        repoDid: row.productAccountDid,
-        session,
-      }),
-    ]);
+    const [oauthProbe, isStoreManaged, germDmHref, fundingDetail] =
+      await Promise.all([
+        fetchStoreListingOAuthProbe(row.id, context),
+        computeIsStoreManaged(row),
+        germDmHrefForMirroredRepoDid({
+          db: context.db,
+          schemaMod: context.schema,
+          repoDid: row.productAccountDid,
+          session,
+        }),
+        loadFundingDetailForDid(context.db, row.productAccountDid),
+      ]);
 
     return toListingDetail(row, {
       isStoreManaged,
       oauthProbe,
       germDmHref,
+      fundingDetail,
     });
   });
 
@@ -2452,21 +2468,24 @@ const getDirectoryListingDetailBySlug = createServerFn({ method: "GET" })
 
     const session = await getAtprotoSessionForRequest(getRequest());
 
-    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
-      fetchStoreListingOAuthProbe(row.id, context),
-      computeIsStoreManaged(row),
-      germDmHrefForMirroredRepoDid({
-        db: context.db,
-        schemaMod: context.schema,
-        repoDid: row.productAccountDid,
-        session,
-      }),
-    ]);
+    const [oauthProbe, isStoreManaged, germDmHref, fundingDetail] =
+      await Promise.all([
+        fetchStoreListingOAuthProbe(row.id, context),
+        computeIsStoreManaged(row),
+        germDmHrefForMirroredRepoDid({
+          db: context.db,
+          schemaMod: context.schema,
+          repoDid: row.productAccountDid,
+          session,
+        }),
+        loadFundingDetailForDid(context.db, row.productAccountDid),
+      ]);
 
     return toListingDetail(row, {
       isStoreManaged,
       oauthProbe,
       germDmHref,
+      fundingDetail,
     });
   });
 
@@ -2577,22 +2596,25 @@ const getDirectoryListingDetailForOwnerEdit = createServerFn({
 
     const { verificationStatus: _removed, ...detailRow } = row;
 
-    const [oauthProbe, isStoreManaged, germDmHref] = await Promise.all([
-      fetchStoreListingOAuthProbe(row.id, context),
-      computeIsStoreManaged(row),
-      germDmHrefForMirroredRepoDid({
-        db: context.db,
-        schemaMod: context.schema,
-        repoDid: row.productAccountDid,
-        session,
-      }),
-    ]);
+    const [oauthProbe, isStoreManaged, germDmHref, fundingDetail] =
+      await Promise.all([
+        fetchStoreListingOAuthProbe(row.id, context),
+        computeIsStoreManaged(row),
+        germDmHrefForMirroredRepoDid({
+          db: context.db,
+          schemaMod: context.schema,
+          repoDid: row.productAccountDid,
+          session,
+        }),
+        loadFundingDetailForDid(context.db, row.productAccountDid),
+      ]);
 
     return {
       ...toListingDetail(detailRow as DirectoryListingDetailRow, {
         isStoreManaged,
         oauthProbe,
         germDmHref,
+        fundingDetail,
       }),
       verificationStatus: row.verificationStatus,
     };
@@ -5839,6 +5861,7 @@ const claimProductListingToPds = createServerFn({ method: "POST" })
 
       scheduleStandardSiteBackfillForProductDid(context.db, session.did);
       scheduleGermDeclarationBackfillForProductDid(context.db, session.did);
+      scheduleFundBackfillForProductDid(context.db, session.did);
 
       return { slug: inheritedSlug };
     } catch (error) {

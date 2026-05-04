@@ -20,6 +20,19 @@ export const GERMNETWORK_NSID = {
   declaration: "com.germnetwork.declaration",
 } as const;
 
+/**
+ * at.fund NSIDs — lexicons owned by https://github.com/andyschwab/at.fund.
+ * ATStore mirrors these records read-only via the Tap consumer + on-demand backfill;
+ * we never publish them ourselves, so they're absent from `atproto:publish-lexicons`.
+ */
+export const FUND_NSID = {
+  actorDeclaration: "fund.at.actor.declaration",
+  fundingContribute: "fund.at.funding.contribute",
+  fundingChannel: "fund.at.funding.channel",
+  fundingPlan: "fund.at.funding.plan",
+  graphDependency: "fund.at.graph.dependency",
+} as const;
+
 export const COLLECTION = {
   authBasic: NSID.authBasic,
   profile: NSID.profile,
@@ -31,4 +44,9 @@ export const COLLECTION = {
   standardDocument: STANDARD_SITE_NSID.document,
   standardPublication: STANDARD_SITE_NSID.publication,
   germnetworkDeclaration: GERMNETWORK_NSID.declaration,
+  fundActorDeclaration: FUND_NSID.actorDeclaration,
+  fundFundingContribute: FUND_NSID.fundingContribute,
+  fundFundingChannel: FUND_NSID.fundingChannel,
+  fundFundingPlan: FUND_NSID.fundingPlan,
+  fundGraphDependency: FUND_NSID.graphDependency,
 } as const;

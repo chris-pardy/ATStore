@@ -1,4 +1,5 @@
 import type { ListingLink } from "#/lib/atproto/listing-record";
+import type { FundingDetail } from "#/lib/atproto/load-funding-summaries";
 
 import * as stylex from "@stylexjs/stylex";
 import {
@@ -17,6 +18,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { BlueskyIcon } from "#/components/bluesky-icon";
+import { FundingPopoverChip } from "#/components/funding-popover-chip";
 import { useButtonStyles } from "#/design-system/theme/useButtonStyles";
 import { ToggleButton } from "#/design-system/toggle-button";
 import {
@@ -27,6 +29,7 @@ import {
   ExternalLink,
   FileText,
   Heart,
+  HeartHandshake,
   LifeBuoy,
   Link as LinkIcon,
   Mail,
@@ -533,7 +536,7 @@ const LISTING_LINK_ICONS = {
   source: Code2,
   license: Scale,
   status: Zap,
-  donate: Heart,
+  donate: HeartHandshake,
   other: LinkIcon,
 } as const satisfies Record<string, typeof LinkIcon>;
 
@@ -580,6 +583,8 @@ function ListingLinksRow({
   externalUrl,
   oauthProbe,
   germDmHref,
+  fundingDetail,
+  productName,
   devListingId,
   devListingSlug,
 }: {
@@ -587,6 +592,8 @@ function ListingLinksRow({
   externalUrl: string | null | undefined;
   oauthProbe: DirectoryListingOAuthProbe | null;
   germDmHref: string | null | undefined;
+  fundingDetail: FundingDetail | null;
+  productName: string;
   devListingId?: string;
   devListingSlug?: string | null;
 }) {
@@ -599,7 +606,24 @@ function ListingLinksRow({
   const trimmedGermHref =
     typeof germDmHref === "string" ? germDmHref.trim() : "";
   const germHrefChip = trimmedGermHref.length > 0 ? trimmedGermHref : null;
-  if (links.length === 0 && !showScopesChip && !germHrefChip) {
+  /**
+   * Funding chip is gated on at least one actionable field (URL / channel / plan /
+   * dependency); a bare declaration with nothing else attached doesn't render.
+   * `<FundingPopoverChip/>` returns null in that case so we can mirror the gate here
+   * for the row-level "do we render anything" check.
+   */
+  const showFundingChip =
+    fundingDetail != null &&
+    (Boolean(fundingDetail.contribute?.url) ||
+      fundingDetail.channels.length > 0 ||
+      fundingDetail.plans.length > 0 ||
+      fundingDetail.dependencies.length > 0);
+  if (
+    links.length === 0 &&
+    !showScopesChip &&
+    !germHrefChip &&
+    !showFundingChip
+  ) {
     return null;
   }
 
@@ -609,7 +633,7 @@ function ListingLinksRow({
       gap="md"
       wrap
       style={styles.linksRow}
-      aria-label="Project links, OAuth scopes, and integrations"
+      aria-label="Project links, OAuth scopes, integrations, and funding"
     >
       {links.map((link, index) => {
         const Icon = getListingLinkIcon(link.type);
@@ -633,6 +657,9 @@ function ListingLinksRow({
           devListingId={devListingId}
           devListingSlug={devListingSlug}
         />
+      ) : null}
+      {showFundingChip ? (
+        <FundingPopoverChip funding={fundingDetail} productName={productName} />
       ) : null}
       {germHrefChip ? <GermNetworkBadge href={germHrefChip} /> : null}
     </Flex>
@@ -818,6 +845,8 @@ function ProductPage() {
           links={listing.links}
           oauthProbe={listing.oauthProbe}
           germDmHref={listing.germDmHref}
+          fundingDetail={listing.fundingDetail}
+          productName={listing.name}
           devListingId={listing.id}
           devListingSlug={productSlug}
         />
