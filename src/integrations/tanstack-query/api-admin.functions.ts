@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAtstoreRepoDid } from "#/lib/atproto/publish-directory-listing";
 import { scheduleStandardSiteBackfillForProductDid } from "#/lib/atproto/standard-site-verify-backfill";
+import { scheduleGermDeclarationBackfillForProductDid } from "#/lib/atproto/tap-germ-declaration-sync";
 import {
   fetchBlueskyHandleForDid,
   fetchBlueskyPublicProfileFields,
@@ -522,6 +523,7 @@ const setListingVerification = createServerFn({ method: "POST" })
       const productDid = priorProductAccountDid?.trim();
       if (productDid?.startsWith("did:")) {
         scheduleStandardSiteBackfillForProductDid(context.db, productDid);
+        scheduleGermDeclarationBackfillForProductDid(context.db, productDid);
       }
     }
 

@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Link as AriaLink } from "react-aria-components";
 
 import { DirectoryListingReviewCard } from "../components/DirectoryListingReviewCard";
+import { GermNetworkBadge } from "../components/GermNetworkBadge";
 import { Avatar } from "../design-system/avatar";
 import { Button } from "../design-system/button";
 import { Flex } from "../design-system/flex";
@@ -230,7 +231,12 @@ function UserProfilePage() {
             src={page.avatarUrl || undefined}
           />
           <Flex direction="column" style={styles.titleBlock}>
-            <Heading3>{mainTitle}</Heading3>
+            <Flex gap="lg" align="center" wrap>
+              <Heading3>{mainTitle}</Heading3>
+              {page.germDmHref ? (
+                <GermNetworkBadge href={page.germDmHref} />
+              ) : null}
+            </Flex>
             {subtitle ? (
               <Text size="sm" variant="secondary">
                 {subtitle}

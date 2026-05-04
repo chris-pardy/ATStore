@@ -51,6 +51,7 @@ import type { DirectoryCategoryOption } from "../lib/directory-categories";
 import { BlueskyMentionCard } from "../components/BlueskyMentionCard";
 import { DirectoryListingReviewCard } from "../components/DirectoryListingReviewCard";
 import { EcosystemCategoryCard } from "../components/EcosystemCategoryCard";
+import { GermNetworkBadge } from "../components/GermNetworkBadge";
 import { HeroImage } from "../components/HeroImage";
 import { ListingOAuthScopesPopoverChip } from "../components/ListingOAuthScopesPopoverChip";
 import { listingOAuthScopesPopoverChipShouldRender } from "../components/ListingOAuthScopesPopoverChip.logic";
@@ -578,12 +579,14 @@ function ListingLinksRow({
   links,
   externalUrl,
   oauthProbe,
+  germDmHref,
   devListingId,
   devListingSlug,
 }: {
   links: Array<ListingLink>;
   externalUrl: string | null | undefined;
   oauthProbe: DirectoryListingOAuthProbe | null;
+  germDmHref: string | null | undefined;
   devListingId?: string;
   devListingSlug?: string | null;
 }) {
@@ -593,7 +596,10 @@ function ListingLinksRow({
     listingOAuthScopesPopoverChipShouldRender({
       oauthProbe,
     });
-  if (links.length === 0 && !showScopesChip) {
+  const trimmedGermHref =
+    typeof germDmHref === "string" ? germDmHref.trim() : "";
+  const germHrefChip = trimmedGermHref.length > 0 ? trimmedGermHref : null;
+  if (links.length === 0 && !showScopesChip && !germHrefChip) {
     return null;
   }
 
@@ -603,7 +609,7 @@ function ListingLinksRow({
       gap="md"
       wrap
       style={styles.linksRow}
-      aria-label="Project links and OAuth scopes"
+      aria-label="Project links, OAuth scopes, and integrations"
     >
       {links.map((link, index) => {
         const Icon = getListingLinkIcon(link.type);
@@ -628,6 +634,7 @@ function ListingLinksRow({
           devListingSlug={devListingSlug}
         />
       ) : null}
+      {germHrefChip ? <GermNetworkBadge href={germHrefChip} /> : null}
     </Flex>
   );
 }
@@ -810,6 +817,7 @@ function ProductPage() {
           externalUrl={listing.externalUrl}
           links={listing.links}
           oauthProbe={listing.oauthProbe}
+          germDmHref={listing.germDmHref}
           devListingId={listing.id}
           devListingSlug={productSlug}
         />

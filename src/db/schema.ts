@@ -368,6 +368,40 @@ export const productSiteDocuments = pgTable(
 );
 
 /**
+ * Tap / backfill mirror of `com.germnetwork.declaration` for product repos (`store_listings.product_account_did`).
+ * Record key is typically `literal:self` → rkey `self`.
+ */
+export const productGermDeclarations = pgTable(
+  "product_germ_declarations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    repoDid: text("repo_did").notNull(),
+    rkey: text("rkey").notNull(),
+    atUri: text("at_uri").notNull(),
+    recordJson: jsonb("record_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    atUriIdx: uniqueIndex("product_germ_declarations_at_uri_idx").on(
+      table.atUri,
+    ),
+    repoRkeyIdx: uniqueIndex("product_germ_declarations_repo_did_rkey_idx").on(
+      table.repoDid,
+      table.rkey,
+    ),
+    repoDidIdx: index("product_germ_declarations_repo_did_idx").on(
+      table.repoDid,
+    ),
+  }),
+);
+
+/**
  * Append-only moderation log: each row is one admin rejection with a human-readable reason.
  * Not touched by Tap ingest. Cleared from the active UX by moving status off `rejected`, not by DELETE.
  */
