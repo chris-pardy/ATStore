@@ -33,6 +33,7 @@ import {
   createListingReviewRecord,
   createListingReviewReplyRecord,
   deleteRecord,
+  ensureProfileSelfRecord,
   fetchListingDetailRecord,
   putListingFavoriteRecord,
   putListingReviewRecord,
@@ -76,6 +77,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   ne,
   or,
@@ -138,6 +140,18 @@ const storeListingLegacyDetailColumns = {
 function listingPublicWhere(table: typeof dbSchema.storeListings, extra?: SQL) {
   const pub = eq(table.verificationStatus, "verified");
   return extra ? and(pub, extra) : pub;
+}
+
+/** Verified public listings exposed over directory XRPC — must have a published listing.detail AT URI. */
+function listingXrpcPublicWhere(
+  table: typeof dbSchema.storeListings,
+  extra?: SQL,
+) {
+  const uriClause = and(
+    isNotNull(table.atUri),
+    sql`trim(${table.atUri}) <> ''`,
+  );
+  return listingPublicWhere(table, extra ? and(extra, uriClause) : uriClause);
 }
 
 function viewerMayReplyOnListingReview(opts: {
@@ -204,6 +218,7 @@ type DirectoryListingRow = {
   id: string;
   name: string;
   slug: string | null;
+  atUri: string | null;
   iconUrl: string | null;
   /** Dedicated hero/cover from `store_listings.hero_image_url` (Tap / publish). */
   heroImageUrl: string | null;
@@ -246,6 +261,14 @@ export interface DirectoryListingCard {
   /** Editorial app tags (e.g. developer tool, social). */
   appTags: Array<string>;
 }
+
+/** Listing card shape for directory XRPC responses (`uri` only — no store UUID/slug). */
+export type DirectoryListingCardXrpc = Omit<
+  DirectoryListingCard,
+  "id" | "slug"
+> & {
+  uri: string;
+};
 
 export interface DirectoryListingDetail extends DirectoryListingCard {
   /** Canonical AT URI for `fyi.atstore.listing.detail` when Tap-synced; needed to publish reviews. */
@@ -914,6 +937,16 @@ function toListingCard(row: DirectoryListingRow): DirectoryListingCard {
   };
 }
 
+function toListingCardXrpc(row: DirectoryListingRow): DirectoryListingCardXrpc {
+  const uri = row.atUri?.trim();
+  if (!uri) {
+    throw new Error("listingXrpcPublicWhere invariant violated: missing atUri");
+  }
+  const base = toListingCard(row);
+  const { id: _id, slug: _slug, ...rest } = base;
+  return { ...rest, uri };
+}
+
 type DirectoryListingDetailRow = DirectoryListingRow & {
   atUri: string | null;
   repoDid: string | null;
@@ -1433,6 +1466,7 @@ function getListingSelect(table: typeof dbSchema.storeListings) {
     id: table.id,
     name: table.name,
     slug: table.slug,
+    atUri: table.atUri,
     iconUrl: table.iconUrl,
     heroImageUrl: table.heroImageUrl,
     screenshotUrls: table.screenshotUrls,
@@ -3264,6 +3298,27 @@ const createDirectoryListingReview = createServerFn({ method: "POST" })
 
     if (existing) {
       throw new Error("You already reviewed this listing.");
+    }
+
+    try {
+      const publicProfile = await fetchBlueskyPublicProfileFields(session.did);
+      const handle =
+        publicProfile?.handle?.trim() && publicProfile.handle.trim().length > 0
+          ? publicProfile.handle.trim()
+          : "";
+      const displayName =
+        publicProfile?.displayName?.trim() ||
+        handle ||
+        session.session.user.name.trim() ||
+        session.did;
+      await ensureProfileSelfRecord(session.client, session.did, {
+        displayName,
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to ensure fyi.atstore.profile record before listing review:",
+        error,
+      );
     }
 
     const createdAt = new Date().toISOString();
@@ -6698,6 +6753,19 @@ const createStoreManagedListing = createServerFn({ method: "POST" })
     const { uri } = await createListingDetailRecord(client, repoDid, record);
     return { uri, slug };
   });
+
+/** Server-only helpers shared with AT Store XRPC handlers. */
+export const directoryListingXrpcHelpers = {
+  listingPublicWhere,
+  listingXrpcPublicWhere,
+  getListingSelect,
+  orderByPopularListingSort,
+  toListingCard,
+  toListingCardXrpc,
+  computeIsStoreManaged,
+  viewerMayReplyOnListingReview,
+  normalizeListingLinks,
+} as const;
 
 export const directoryListingApi = {
   getHomePageData,

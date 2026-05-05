@@ -1,0 +1,119 @@
+{
+  "lexicon": 1,
+  "id": "fyi.atstore.directory.searchListings",
+  "defs": {
+    "listingCardSearch": {
+      "type": "object",
+      "required": [
+        "uri",
+        "name",
+        "tagline",
+        "description",
+        "category",
+        "accent",
+        "reviewCount",
+        "priceLabel",
+        "appTags",
+        "categorySlugs"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "at-uri",
+          "maxLength": 2560,
+          "description": "AT URI of the fyi.atstore.listing.detail record."
+        },
+        "name": { "type": "string", "maxLength": 640 },
+        "tagline": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 20000 },
+        "iconUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "heroImageUrl": {
+          "type": "string",
+          "maxLength": 8192,
+          "nullable": true
+        },
+        "categorySlug": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
+        "categorySlugs": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 512 }
+        },
+        "category": { "type": "string", "maxLength": 640 },
+        "accent": {
+          "type": "string",
+          "maxLength": 16,
+          "knownValues": ["blue", "pink", "purple", "green"]
+        },
+        "rating": {
+          "type": "string",
+          "maxLength": 16,
+          "nullable": true
+        },
+        "reviewCount": { "type": "integer" },
+        "priceLabel": { "type": "string", "maxLength": 32 },
+        "productAccountHandle": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
+        "appTags": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "main": {
+      "type": "query",
+      "description": "Directory listing search and pagination (verified listings with a listing.detail AT URI only).",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "sort": {
+            "type": "string",
+            "maxLength": 24,
+            "default": "popular",
+            "enum": ["popular", "newest", "alphabetical"]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 24
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["listings"],
+          "properties": {
+            "cursor": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "listings": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#listingCardSearch"
+              }
+            }
+          }
+        }
+      },
+      "errors": [{ "name": "InvalidCursor" }]
+    }
+  }
+}

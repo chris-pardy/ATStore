@@ -1,0 +1,155 @@
+{
+  "lexicon": 1,
+  "id": "fyi.atstore.directory.getListing",
+  "defs": {
+    "listingCardGet": {
+      "type": "object",
+      "required": [
+        "uri",
+        "name",
+        "tagline",
+        "description",
+        "category",
+        "accent",
+        "reviewCount",
+        "priceLabel",
+        "appTags",
+        "categorySlugs"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "at-uri",
+          "maxLength": 2560,
+          "description": "AT URI of the fyi.atstore.listing.detail record."
+        },
+        "name": { "type": "string", "maxLength": 640 },
+        "tagline": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 20000 },
+        "iconUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "heroImageUrl": {
+          "type": "string",
+          "maxLength": 8192,
+          "nullable": true
+        },
+        "categorySlug": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
+        "categorySlugs": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 512 }
+        },
+        "category": { "type": "string", "maxLength": 640 },
+        "accent": {
+          "type": "string",
+          "maxLength": 16,
+          "knownValues": ["blue", "pink", "purple", "green"]
+        },
+        "rating": {
+          "type": "string",
+          "maxLength": 16,
+          "nullable": true
+        },
+        "reviewCount": { "type": "integer" },
+        "priceLabel": { "type": "string", "maxLength": 32 },
+        "productAccountHandle": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
+        "appTags": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "listingLinkRow": {
+      "type": "object",
+      "required": ["uri"],
+      "properties": {
+        "label": { "type": "string", "maxLength": 640 },
+        "uri": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "listingDetailResponse": {
+      "type": "object",
+      "required": ["listing", "isStoreManaged"],
+      "properties": {
+        "listing": {
+          "type": "ref",
+          "ref": "#listingCardGet"
+        },
+        "isStoreManaged": { "type": "boolean" },
+        "repoDid": { "type": "string", "maxLength": 2048, "nullable": true },
+        "productAccountDid": {
+          "type": "string",
+          "maxLength": 2048,
+          "nullable": true
+        },
+        "sourceTagline": {
+          "type": "string",
+          "maxLength": 20000,
+          "nullable": true
+        },
+        "sourceFullDescription": {
+          "type": "string",
+          "maxLength": 20000,
+          "nullable": true
+        },
+        "screenshots": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 4096 }
+        },
+        "externalUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "nullable": true
+        },
+        "sourceUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "createdAt": { "type": "string", "maxLength": 64, "nullable": true },
+        "updatedAt": { "type": "string", "maxLength": 64, "nullable": true },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "ref",
+            "ref": "#listingLinkRow"
+          }
+        }
+      }
+    },
+    "main": {
+      "type": "query",
+      "description": "Fetch one public verified listing. Provide exactly one of `uri` (fyi.atstore.listing.detail AT URI) or `externalUrl` (unique storefront URL); `externalUrl` uses the same matching rules as the former resolve endpoint.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "format": "at-uri",
+            "maxLength": 2560,
+            "description": "AT URI of the fyi.atstore.listing.detail record."
+          },
+          "externalUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Listing external_url / product URL as stored on the record; must match at most one public listing."
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "#listingDetailResponse"
+        }
+      },
+      "errors": [
+        { "name": "ListingNotFound" },
+        { "name": "InvalidParams" },
+        { "name": "AmbiguousResolution" }
+      ]
+    }
+  }
+}

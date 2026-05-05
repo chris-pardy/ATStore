@@ -1,12 +1,25 @@
 /** AT Store lexicon NSIDs (`fyi.atstore.*`). */
 export const NSID = {
   authBasic: "fyi.atstore.authBasic",
+  authThirdPartyReviews: "fyi.atstore.authThirdPartyReviews",
   profile: "fyi.atstore.profile",
   listingDetail: "fyi.atstore.listing.detail",
   listingReview: "fyi.atstore.listing.review",
   listingReviewReply: "fyi.atstore.listing.reviewReply",
   listingFavorite: "fyi.atstore.listing.favorite",
   lexiconSchema: "com.atproto.lexicon.schema",
+  directorySearchListings: "fyi.atstore.directory.searchListings",
+  directoryGetListing: "fyi.atstore.directory.getListing",
+  reviewsListForListing: "fyi.atstore.reviews.listForListing",
+  serverDescribe: "fyi.atstore.server.describe",
+} as const;
+
+/** Stable strings for `/xrpc/:nsid` routing and docs. */
+export const ATSTORE_XRPC_METHOD = {
+  directorySearchListings: NSID.directorySearchListings,
+  directoryGetListing: NSID.directoryGetListing,
+  reviewsListForListing: NSID.reviewsListForListing,
+  serverDescribe: NSID.serverDescribe,
 } as const;
 
 /** Standard.site (product updates / permalinks). */

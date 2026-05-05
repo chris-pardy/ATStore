@@ -10,6 +10,7 @@
   },
   "ignorePatterns": [
     "**/routeTree.gen.ts",
+    "**/src/lexicons/generated/bundle.ts",
     "eslint.config.js",
     "**/public/**/*.js",
     "**/node_modules",
