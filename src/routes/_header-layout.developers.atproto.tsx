@@ -83,8 +83,11 @@ const styles = stylex.create({
     lineHeight: 1.4,
     wordBreak: "break-word",
   },
+  tableWrapper: {
+    overflow: "auto",
+  },
   methodsTable: {
-    width: "100%",
+    width: "100% !important",
   },
   pre: {
     marginBottom: 0,
@@ -131,7 +134,7 @@ function DevelopersAtprotoPage() {
 
         <Flex direction="column" gap="4xl">
           <Heading3>Methods</Heading3>
-          <ResizableTableContainer>
+          <ResizableTableContainer {...stylex.props(styles.tableWrapper)}>
             <Table
               aria-label="AT Store XRPC methods"
               style={styles.methodsTable}
@@ -144,7 +147,7 @@ function DevelopersAtprotoPage() {
                         ? 320
                         : column.id === "method"
                           ? 32
-                          : null
+                          : 400
                     }
                   >
                     {column.name}
