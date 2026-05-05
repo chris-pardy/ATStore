@@ -10,7 +10,6 @@ export const NSID = {
   lexiconSchema: "com.atproto.lexicon.schema",
   directorySearchListings: "fyi.atstore.directory.searchListings",
   directoryGetListing: "fyi.atstore.directory.getListing",
-  directoryResolveListing: "fyi.atstore.directory.resolveListing",
   reviewsListForListing: "fyi.atstore.reviews.listForListing",
   serverDescribe: "fyi.atstore.server.describe",
 } as const;
@@ -19,7 +18,6 @@ export const NSID = {
 export const ATSTORE_XRPC_METHOD = {
   directorySearchListings: NSID.directorySearchListings,
   directoryGetListing: NSID.directoryGetListing,
-  directoryResolveListing: NSID.directoryResolveListing,
   reviewsListForListing: NSID.reviewsListForListing,
   serverDescribe: NSID.serverDescribe,
 } as const;

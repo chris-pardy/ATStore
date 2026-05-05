@@ -121,16 +121,20 @@
     },
     "main": {
       "type": "query",
-      "description": "Fetch one public verified listing by fyi.atstore.listing.detail AT URI.",
+      "description": "Fetch one public verified listing. Provide exactly one of `uri` (fyi.atstore.listing.detail AT URI) or `externalUrl` (unique storefront URL); `externalUrl` uses the same matching rules as the former resolve endpoint.",
       "parameters": {
         "type": "params",
-        "required": ["uri"],
         "properties": {
           "uri": {
             "type": "string",
             "format": "at-uri",
             "maxLength": 2560,
             "description": "AT URI of the fyi.atstore.listing.detail record."
+          },
+          "externalUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Listing external_url / product URL as stored on the record; must match at most one public listing."
           }
         }
       },
@@ -141,7 +145,11 @@
           "ref": "#listingDetailResponse"
         }
       },
-      "errors": [{ "name": "ListingNotFound" }, { "name": "InvalidParams" }]
+      "errors": [
+        { "name": "ListingNotFound" },
+        { "name": "InvalidParams" },
+        { "name": "AmbiguousResolution" }
+      ]
     }
   }
 }

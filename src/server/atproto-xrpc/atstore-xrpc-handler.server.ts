@@ -182,74 +182,54 @@ async function handleSearchListings(url: URL) {
   });
 }
 
-async function fetchVerifiedListingDetailRowByUri(uriRaw: string) {
-  const canonical = listingDetailUriOrNull(uriRaw);
-  if (!canonical) {
-    return { error: "InvalidParams" as const };
-  }
-
-  const table = schema.storeListings;
-  const { listingXrpcPublicWhere } = directoryListingXrpcHelpers;
-
-  const filter = eq(table.atUri, canonical);
-
-  const [row] = await db
-    .select({
-      id: table.id,
-      sourceUrl: table.sourceUrl,
-      name: table.name,
-      slug: table.slug,
-      externalUrl: table.externalUrl,
-      iconUrl: table.iconUrl,
-      heroImageUrl: table.heroImageUrl,
-      screenshotUrls: table.screenshotUrls,
-      tagline: table.tagline,
-      fullDescription: table.fullDescription,
-      categorySlugs: table.categorySlugs,
-      atUri: table.atUri,
-      repoDid: table.repoDid,
-      migratedFromAtUri: table.migratedFromAtUri,
-      productAccountDid: table.productAccountDid,
-      productAccountHandle: table.productAccountHandle,
-      reviewCount: table.reviewCount,
-      averageRating: table.averageRating,
-      ...LEGACY_DETAIL_SQL,
-      appTags: table.appTags,
-      links: table.links,
-      createdAt: table.createdAt,
-      updatedAt: table.updatedAt,
-    })
-    .from(table)
-    .where(listingXrpcPublicWhere(table, filter))
-    .limit(1);
-
-  if (!row) {
-    return { error: "ListingNotFound" as const };
-  }
-  return { row };
+function verifiedListingDetailSelect(table: typeof schema.storeListings) {
+  return {
+    id: table.id,
+    sourceUrl: table.sourceUrl,
+    name: table.name,
+    slug: table.slug,
+    externalUrl: table.externalUrl,
+    iconUrl: table.iconUrl,
+    heroImageUrl: table.heroImageUrl,
+    screenshotUrls: table.screenshotUrls,
+    tagline: table.tagline,
+    fullDescription: table.fullDescription,
+    categorySlugs: table.categorySlugs,
+    atUri: table.atUri,
+    repoDid: table.repoDid,
+    migratedFromAtUri: table.migratedFromAtUri,
+    productAccountDid: table.productAccountDid,
+    productAccountHandle: table.productAccountHandle,
+    reviewCount: table.reviewCount,
+    averageRating: table.averageRating,
+    ...LEGACY_DETAIL_SQL,
+    appTags: table.appTags,
+    links: table.links,
+    createdAt: table.createdAt,
+    updatedAt: table.updatedAt,
+  };
 }
 
-async function handleGetListing(url: URL) {
-  const uriParam = url.searchParams.get("uri") ?? "";
-  const fetched = await fetchVerifiedListingDetailRowByUri(uriParam);
-  if ("error" in fetched) {
-    switch (fetched.error) {
-      case "InvalidParams": {
-        return xrpcErr(400, fetched.error);
-      }
-      case "ListingNotFound": {
-        return xrpcErr(404, fetched.error);
-      }
-      default: {
-        return xrpcErr(500, "InternalError");
-      }
-    }
-  }
+type VerifiedListingDetailRowForXrpc = Parameters<
+  (typeof directoryListingXrpcHelpers)["toListingCardXrpc"]
+>[0] & {
+  links: unknown;
+  repoDid: string | null;
+  migratedFromAtUri: string | null;
+  productAccountDid: string | null;
+  sourceUrl: string;
+  externalUrl: string | null;
+  tagline: string | null;
+  fullDescription: string | null;
+  screenshotUrls: Array<string>;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
+async function listingDetailXrpcPayload(row: VerifiedListingDetailRowForXrpc) {
   const { toListingCardXrpc, computeIsStoreManaged, normalizeListingLinks } =
     directoryListingXrpcHelpers;
 
-  const row = fetched.row;
   const listing = listingCardXrpcJson(toListingCardXrpc(row));
   const isStoreManaged = await computeIsStoreManaged(row);
 
@@ -257,7 +237,7 @@ async function handleGetListing(url: URL) {
     row.links as Array<ListingLink> | null,
   );
 
-  return xrpcJson({
+  return {
     listing,
     isStoreManaged,
     repoDid: row.repoDid ?? null,
@@ -273,16 +253,66 @@ async function handleGetListing(url: URL) {
       ...(link.label ? { label: link.label } : {}),
       uri: link.url,
     })),
-  });
+  };
 }
 
-async function handleResolveListing(url: URL) {
-  const externalUrl = url.searchParams.get("externalUrl")?.trim();
-  if (!externalUrl) {
-    return xrpcErr(400, "InvalidParams", "externalUrl is required.");
+async function fetchVerifiedListingDetailRowByUri(uriRaw: string) {
+  const canonical = listingDetailUriOrNull(uriRaw);
+  if (!canonical) {
+    return { error: "InvalidParams" as const };
   }
 
-  const variants = normalizeExternalUrlCandidates(externalUrl);
+  const table = schema.storeListings;
+  const { listingXrpcPublicWhere } = directoryListingXrpcHelpers;
+
+  const filter = eq(table.atUri, canonical);
+
+  const [row] = await db
+    .select(verifiedListingDetailSelect(table))
+    .from(table)
+    .where(listingXrpcPublicWhere(table, filter))
+    .limit(1);
+
+  if (!row) {
+    return { error: "ListingNotFound" as const };
+  }
+  return { row };
+}
+
+async function handleGetListing(url: URL) {
+  const uriParam = url.searchParams.get("uri")?.trim() ?? "";
+  const externalUrlParam = url.searchParams.get("externalUrl")?.trim() ?? "";
+  const hasUri = uriParam.length > 0;
+  const hasExternal = externalUrlParam.length > 0;
+
+  if (hasUri === hasExternal) {
+    return xrpcErr(
+      400,
+      "InvalidParams",
+      "Provide exactly one of uri or externalUrl.",
+    );
+  }
+
+  if (hasUri) {
+    const fetched = await fetchVerifiedListingDetailRowByUri(uriParam);
+    if ("error" in fetched) {
+      switch (fetched.error) {
+        case "InvalidParams": {
+          return xrpcErr(400, fetched.error);
+        }
+        case "ListingNotFound": {
+          return xrpcErr(404, fetched.error);
+        }
+        default: {
+          return xrpcErr(500, "InternalError");
+        }
+      }
+    }
+
+    return xrpcJson(await listingDetailXrpcPayload(fetched.row));
+  }
+
+  const variants = normalizeExternalUrlCandidates(externalUrlParam);
   if (variants.length === 0) {
     return xrpcErr(400, "InvalidParams");
   }
@@ -303,9 +333,7 @@ async function handleResolveListing(url: URL) {
   }
 
   const rows = await db
-    .select({
-      atUri: table.atUri,
-    })
+    .select(verifiedListingDetailSelect(table))
     .from(table)
     .where(listingXrpcPublicWhere(table, clause))
     .limit(4);
@@ -317,18 +345,12 @@ async function handleResolveListing(url: URL) {
     return xrpcErr(409, "AmbiguousResolution");
   }
 
-  const hit = rows.at(0);
-  if (!hit) {
-    return xrpcErr(404, "ListingNotFound");
-  }
-  const uri = hit.atUri?.trim();
-  if (!uri) {
+  const row = rows.at(0);
+  if (!row?.atUri?.trim()) {
     return xrpcErr(404, "ListingNotFound");
   }
 
-  return xrpcJson({
-    uri,
-  });
+  return xrpcJson(await listingDetailXrpcPayload(row));
 }
 
 async function handleListReviews(url: URL, request: Request) {
@@ -471,13 +493,6 @@ export async function handleAtstoreXrpc(
           return xrpcErr(405, "MethodNotAllowed");
         }
         return handleGetListing(url);
-      }
-
-      case ATSTORE_XRPC_METHOD.directoryResolveListing: {
-        if (request.method !== "GET") {
-          return xrpcErr(405, "MethodNotAllowed");
-        }
-        return handleResolveListing(url);
       }
 
       case ATSTORE_XRPC_METHOD.reviewsListForListing: {

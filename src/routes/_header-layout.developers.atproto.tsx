@@ -26,6 +26,7 @@ import {
 import { Text } from "#/design-system/typography/text";
 import { ATSTORE_XRPC_METHOD, NSID } from "#/lib/atproto/nsids";
 import { buildRouteOgMeta } from "#/lib/og-meta";
+import { ResizableTableContainer } from "react-aria-components";
 
 const METHOD_ROWS: ReadonlyArray<{
   nsid: string;
@@ -46,12 +47,7 @@ const METHOD_ROWS: ReadonlyArray<{
     nsid: ATSTORE_XRPC_METHOD.directoryGetListing,
     method: "GET",
     summary:
-      "Detail projection by listing.detail AT URI (`uri` query param); card uses `listing.uri`.",
-  },
-  {
-    nsid: ATSTORE_XRPC_METHOD.directoryResolveListing,
-    method: "GET",
-    summary: "Resolve `externalUrl` to listing.detail AT URI (`uri`).",
+      "Listing detail: exactly one of `uri` (listing.detail AT URI) or `externalUrl` (unique storefront URL).",
   },
   {
     nsid: ATSTORE_XRPC_METHOD.reviewsListForListing,
@@ -116,7 +112,7 @@ function DevelopersAtprotoPage() {
     <Page.Root variant="large" style={styles.page}>
       <Flex direction="column" gap="7xl">
         <Flex direction="column" gap="6xl">
-          <Heading2>AT Protocol on AT Store</Heading2>
+          <Heading2>AT Protocol on ATStore</Heading2>
           <Body variant="secondary">
             Public GET endpoints under{" "}
             <Text weight="medium">/xrpc/&lt;nsid&gt;</Text>. Lexicons:{" "}
@@ -135,34 +131,51 @@ function DevelopersAtprotoPage() {
 
         <Flex direction="column" gap="4xl">
           <Heading3>Methods</Heading3>
-          <Table aria-label="AT Store XRPC methods" style={styles.methodsTable}>
-            <TableHeader columns={METHOD_TABLE_COLUMNS}>
-              {(column) => <TableColumn>{column.name}</TableColumn>}
-            </TableHeader>
-            <TableBody items={[...METHOD_ROWS]}>
-              {(row) => (
-                <TableRow
-                  columns={METHOD_TABLE_COLUMNS}
-                  id={row.nsid}
-                  textValue={`${row.method} ${row.nsid} ${row.summary}`}
-                >
-                  {(column) => (
-                    <TableCell>
-                      {column.id === "method" ? (
-                        <Text weight="medium">{row.method}</Text>
-                      ) : column.id === "nsid" ? (
-                        <span {...stylex.props(styles.monoTight)}>
-                          {row.nsid}
-                        </span>
-                      ) : (
-                        <Body>{row.summary}</Body>
-                      )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <ResizableTableContainer>
+            <Table
+              aria-label="AT Store XRPC methods"
+              style={styles.methodsTable}
+            >
+              <TableHeader columns={METHOD_TABLE_COLUMNS}>
+                {(column) => (
+                  <TableColumn
+                    width={
+                      column.id === "nsid"
+                        ? 320
+                        : column.id === "method"
+                          ? 32
+                          : null
+                    }
+                  >
+                    {column.name}
+                  </TableColumn>
+                )}
+              </TableHeader>
+              <TableBody items={[...METHOD_ROWS]}>
+                {(row) => (
+                  <TableRow
+                    columns={METHOD_TABLE_COLUMNS}
+                    id={row.nsid}
+                    textValue={`${row.method} ${row.nsid} ${row.summary}`}
+                  >
+                    {(column) => (
+                      <TableCell>
+                        {column.id === "method" ? (
+                          <Text weight="medium">{row.method}</Text>
+                        ) : column.id === "nsid" ? (
+                          <span {...stylex.props(styles.monoTight)}>
+                            {row.nsid}
+                          </span>
+                        ) : (
+                          <Body>{row.summary}</Body>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ResizableTableContainer>
         </Flex>
 
         <Flex direction="column" gap="5xl">
@@ -177,7 +190,8 @@ function DevelopersAtprotoPage() {
               {ATSTORE_XRPC_METHOD.directoryGetListing}
             </span>{" "}
             with query param <Text weight="medium">uri</Text> (the
-            listing.detail AT URI); the JSON includes it as{" "}
+            listing.detail AT URI) or <Text weight="medium">externalUrl</Text>{" "}
+            (unique storefront URL); do not pass both. The JSON includes{" "}
             <Text weight="medium">listing.uri</Text>. Use that value as{" "}
             <Text weight="medium">subject</Text> on a new{" "}
             <span {...stylex.props(styles.monoTight)}>
