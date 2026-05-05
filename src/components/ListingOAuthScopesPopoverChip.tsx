@@ -12,13 +12,14 @@ import type { PermissionGrantStructuredLine } from "../lib/oauth-permission-gran
 
 import { Button as DsButton } from "../design-system/button";
 import { Flex } from "../design-system/flex";
-import { Popover } from "../design-system/popover";
+import { HoverCard } from "../design-system/hover-card";
 import { Separator } from "../design-system/separator";
 import { uiColor, warningColor } from "../design-system/theme/color.stylex";
 import { radius } from "../design-system/theme/radius.stylex";
 import {
   gap,
   horizontalSpace,
+  size,
   verticalSpace,
 } from "../design-system/theme/semantic-spacing.stylex";
 import {
@@ -154,6 +155,27 @@ const styles = stylex.create({
     maxWidth: "min(432px, 94vw)",
     overflowX: "hidden",
     overflowY: "auto",
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+  },
+  header: {
+    alignItems: "center",
+    display: "flex",
+    justifyContent: "space-between",
+    borderBottomColor: uiColor.border2,
+    borderBottomStyle: "solid",
+    borderBottomWidth: 1,
+    height: size["4xl"],
+    paddingLeft: horizontalSpace["2xl"],
+    paddingRight: horizontalSpace["2xl"],
+  },
+  content: {
+    paddingBottom: verticalSpace["2xl"],
+    paddingLeft: horizontalSpace["2xl"],
+    paddingRight: horizontalSpace["2xl"],
+    paddingTop: verticalSpace["4xl"],
   },
   scopesLinkChip: {
     borderColor: uiColor.border1,
@@ -775,7 +797,7 @@ export function ListingOAuthScopesPopoverChip(props: {
   }
 
   return (
-    <Popover
+    <HoverCard
       placement="bottom start"
       trigger={
         <Button
@@ -795,11 +817,14 @@ export function ListingOAuthScopesPopoverChip(props: {
       }
       style={styles.popoverSurface}
     >
-      <Flex direction="column" gap="4xl">
-        <Flex direction="column" gap="4xl">
-          <Text size="lg" weight="semibold">
+      <Flex direction="column">
+        <Flex gap="4xl" style={styles.header}>
+          <Text size="base" weight="semibold">
             {popoverHeading}
           </Text>
+        </Flex>
+
+        <Flex direction="column" gap="4xl" style={styles.content}>
           {props.oauthProbe != null &&
           props.oauthProbe.status !== "skipped_no_url" &&
           props.oauthProbe.status !== "error"
@@ -807,78 +832,80 @@ export function ListingOAuthScopesPopoverChip(props: {
                 probe: props.oauthProbe,
               })
             : null}
-        </Flex>
 
-        {elevated ? (
-          <SmallBody variant="critical">
-            Client metadata asks for{" "}
-            <span {...stylex.props(styles.tokenChip)}>transition:generic</span>{" "}
-            — similar to legacy <strong>app passwords</strong>. Only continue if
-            you trust this app.
-          </SmallBody>
-        ) : null}
-
-        {props.oauthProbe == null ? (
-          <Body variant="secondary">
-            Nothing recorded yet — check back after the next crawl.
-          </Body>
-        ) : props.oauthProbe.status === "skipped_no_url" ? (
-          <Body variant="secondary">No URL was available to scan.</Body>
-        ) : props.oauthProbe.status === "error" ? (
-          <Flex direction="column" gap="sm">
-            <Body variant="critical">Could not fetch OAuth metadata.</Body>
-            <SmallBody variant="secondary">
-              {props.oauthProbe.probeError?.trim() ||
-                "Unreachable host or crawl error."}
+          {elevated ? (
+            <SmallBody variant="critical">
+              Client metadata asks for{" "}
+              <span {...stylex.props(styles.tokenChip)}>
+                transition:generic
+              </span>{" "}
+              — similar to legacy <strong>app passwords</strong>. Only continue
+              if you trust this app.
             </SmallBody>
-          </Flex>
-        ) : (
-          <>
-            <Separator />
-            {storefrontScopesPopoverBody({ probe: props.oauthProbe })}
-          </>
-        )}
+          ) : null}
 
-        {showDevRescan ? (
-          <>
-            <Separator />
+          {props.oauthProbe == null ? (
+            <Body variant="secondary">
+              Nothing recorded yet — check back after the next crawl.
+            </Body>
+          ) : props.oauthProbe.status === "skipped_no_url" ? (
+            <Body variant="secondary">No URL was available to scan.</Body>
+          ) : props.oauthProbe.status === "error" ? (
             <Flex direction="column" gap="sm">
-              <Flex align="center" gap="md" justify="between" wrap>
-                <SmallBody variant="secondary">
-                  Dev — re-run the storefront OAuth probe and sync results to
-                  the DB.
-                </SmallBody>
-                <DsButton
-                  variant="secondary"
-                  size="sm"
-                  isPending={rescanOAuthProbeDev.isPending}
-                  isDisabled={rescanOAuthProbeDev.isPending}
-                  onPress={() => rescanOAuthProbeDev.mutate()}
-                >
-                  <Flex align="center" gap="xs">
-                    <RefreshCw aria-hidden size={14} strokeWidth={2} />
-                    Rescan permissions
-                  </Flex>
-                </DsButton>
-              </Flex>
-              {rescanOAuthProbeDev.isError ? (
-                <SmallBody variant="critical">
-                  {rescanOAuthProbeDev.error instanceof Error
-                    ? rescanOAuthProbeDev.error.message
-                    : "Rescan failed."}
-                </SmallBody>
-              ) : null}
+              <Body variant="critical">Could not fetch OAuth metadata.</Body>
+              <SmallBody variant="secondary">
+                {props.oauthProbe.probeError?.trim() ||
+                  "Unreachable host or crawl error."}
+              </SmallBody>
             </Flex>
-          </>
-        ) : null}
+          ) : (
+            <>
+              <Separator />
+              {storefrontScopesPopoverBody({ probe: props.oauthProbe })}
+            </>
+          )}
 
-        {props.oauthProbe == null ||
-        props.oauthProbe.status === "skipped_no_url" ? null : (
-          <SmallBody style={styles.metaFooter} variant="secondary">
-            Last sampled {formatProbedAt(props.oauthProbe.probedAt)}
-          </SmallBody>
-        )}
+          {showDevRescan ? (
+            <>
+              <Separator />
+              <Flex direction="column" gap="sm">
+                <Flex align="center" gap="md" justify="between" wrap>
+                  <SmallBody variant="secondary">
+                    Dev — re-run the storefront OAuth probe and sync results to
+                    the DB.
+                  </SmallBody>
+                  <DsButton
+                    variant="secondary"
+                    size="sm"
+                    isPending={rescanOAuthProbeDev.isPending}
+                    isDisabled={rescanOAuthProbeDev.isPending}
+                    onPress={() => rescanOAuthProbeDev.mutate()}
+                  >
+                    <Flex align="center" gap="xs">
+                      <RefreshCw aria-hidden size={14} strokeWidth={2} />
+                      Rescan permissions
+                    </Flex>
+                  </DsButton>
+                </Flex>
+                {rescanOAuthProbeDev.isError ? (
+                  <SmallBody variant="critical">
+                    {rescanOAuthProbeDev.error instanceof Error
+                      ? rescanOAuthProbeDev.error.message
+                      : "Rescan failed."}
+                  </SmallBody>
+                ) : null}
+              </Flex>
+            </>
+          ) : null}
+
+          {props.oauthProbe == null ||
+          props.oauthProbe.status === "skipped_no_url" ? null : (
+            <SmallBody style={styles.metaFooter} variant="secondary">
+              Last sampled {formatProbedAt(props.oauthProbe.probedAt)}
+            </SmallBody>
+          )}
+        </Flex>
       </Flex>
-    </Popover>
+    </HoverCard>
   );
 }

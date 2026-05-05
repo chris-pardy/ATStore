@@ -17,17 +17,24 @@ import * as stylex from "@stylexjs/stylex";
 import { Avatar } from "#/design-system/avatar";
 import { Button } from "#/design-system/button";
 import { Flex } from "#/design-system/flex";
-import { Popover } from "#/design-system/popover";
 import { Separator } from "#/design-system/separator";
-import { uiColor } from "#/design-system/theme/color.stylex";
+import {
+  primaryColor,
+  successColor,
+  uiColor,
+} from "#/design-system/theme/color.stylex";
 import { radius } from "#/design-system/theme/radius.stylex";
 import {
   gap,
   horizontalSpace,
+  size,
   verticalSpace,
 } from "#/design-system/theme/semantic-spacing.stylex";
-import { fontFamily, fontSize } from "#/design-system/theme/typography.stylex";
-import { SmallBody } from "#/design-system/typography";
+import {
+  fontFamily,
+  fontSize,
+  fontWeight,
+} from "#/design-system/theme/typography.stylex";
 import { Text } from "#/design-system/typography/text";
 import {
   deriveChannelLabel,
@@ -35,10 +42,45 @@ import {
 } from "#/lib/atproto/fund-format";
 import { urlsMatch } from "#/lib/atproto/load-funding-summaries";
 import { getInitials } from "#/lib/get-initials";
-import { ArrowRight, ExternalLink, HeartHandshake } from "lucide-react";
+import { CreditCard, GitMerge, HeartHandshake, Package } from "lucide-react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
 
+import { HoverCard } from "../design-system/hover-card";
+import { green } from "../design-system/theme/colors/green.stylex";
+
+const greenTheme = stylex.createTheme(primaryColor, {
+  bg: green.bg,
+  bgSubtle: green.bgSubtle,
+  component1: green.component1,
+  component2: green.component2,
+  component3: green.component3,
+  border1: green.border1,
+  border2: green.border2,
+  border3: green.border3,
+  solid1: green.solid1,
+  solid2: green.solid2,
+  text1: green.text1,
+  text2: green.text2,
+});
+
 const styles = stylex.create({
+  channelPillIcon: {
+    borderColor: successColor.border1,
+    borderRadius: radius.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    cornerShape: "squircle",
+    alignItems: "center",
+    backgroundColor: successColor.bgSubtle,
+    color: successColor.text1,
+    display: "flex",
+    justifyContent: "center",
+    height: size["3xl"],
+    width: size["3xl"],
+  },
+  grow: {
+    flexGrow: 1,
+  },
   /**
    * Pill trigger for the popover — mirrors `ListingOAuthScopesPopoverChip` so the
    * Funding chip sits flush in the project-links row alongside Scopes / Germ.
@@ -75,16 +117,19 @@ const styles = stylex.create({
   },
   popoverSurface: {
     maxHeight: "min(480px, 78vh)",
-    maxWidth: "min(432px, 94vw)",
+    maxWidth: "min(480px, 94vw)",
     overflowX: "hidden",
     overflowY: "auto",
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
   },
   /** Sub-label for the "Depends on" block (small caps, like a tag). */
   sectionLabel: {
     color: uiColor.text2,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
   },
   /**
    * Pill-shaped channel/plan combo chip — same neutral palette as the surrounding
@@ -92,57 +137,85 @@ const styles = stylex.create({
    * for attention.
    */
   channelPill: {
-    borderColor: uiColor.border1,
-    borderRadius: radius.full,
+    borderColor: {
+      default: uiColor.border1,
+      ":is([data-hovered])": uiColor.border2,
+    },
+    borderRadius: radius.md,
     borderStyle: "solid",
     borderWidth: 1,
-    gap: gap.sm,
+    cornerShape: "squircle",
+    gap: gap["2xl"],
     paddingBlock: verticalSpace.sm,
-    paddingInline: horizontalSpace.xl,
     textDecoration: "none",
     alignItems: "center",
     backgroundColor: {
-      default: uiColor.component1,
-      ":hover": uiColor.component2,
+      default: uiColor.bgSubtle,
+      ":is([data-hovered])": uiColor.component1,
     },
-    color: uiColor.text1,
+    color: uiColor.text2,
     cursor: "pointer",
     display: "inline-flex",
-    fontWeight: 600,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    paddingInlineEnd: horizontalSpace.md,
+    paddingInlineStart: horizontalSpace.md,
+    textAlign: "left",
   },
   channelPillStatic: {
     cursor: "default",
   },
   channelPillPrice: {
-    color: uiColor.text2,
+    borderColor: successColor.border1,
+    borderRadius: radius.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    paddingBlock: verticalSpace.sm,
+    paddingInline: horizontalSpace.md,
+    backgroundColor: successColor.bgSubtle,
+    color: successColor.text2,
+    fontFamily: fontFamily.mono,
+    fontSize: fontSize.xs,
+    fontVariantNumeric: "tabular-nums",
     fontWeight: 500,
   },
   /** Each "Depends on" row — full row clickable, plain link semantics. */
   dependsRow: {
     borderRadius: radius.md,
+    cornerShape: "squircle",
     gap: gap.lg,
     paddingBlock: verticalSpace.sm,
-    paddingInline: horizontalSpace.sm,
+    paddingInline: horizontalSpace.md,
     textDecoration: "none",
     alignItems: "center",
     backgroundColor: {
       default: "transparent",
       ":hover": uiColor.component2,
     },
-    color: uiColor.text1,
+    color: uiColor.text2,
     cursor: "pointer",
     display: "flex",
+    marginLeft: `calc(${gap.md} * -1)`,
+    marginRight: `calc(${gap.md} * -1)`,
   },
   dependsName: {
     flexGrow: 1,
     fontWeight: 600,
     minWidth: 0,
   },
-  arrow: {
-    color: uiColor.text2,
-    flexShrink: 0,
-    height: "1rem",
-    width: "1rem",
+  header: {
+    borderBottomColor: uiColor.border2,
+    borderBottomStyle: "solid",
+    borderBottomWidth: 1,
+    height: size["4xl"],
+    paddingLeft: horizontalSpace["2xl"],
+    paddingRight: horizontalSpace["2xl"],
+  },
+  content: {
+    paddingBottom: verticalSpace["lg"],
+    paddingLeft: horizontalSpace["2xl"],
+    paddingRight: horizontalSpace["2xl"],
+    paddingTop: verticalSpace["2xl"],
   },
 });
 
@@ -181,20 +254,14 @@ function hasActionableFunding(funding: FundingDetail): boolean {
 export function FundingPopoverChip({
   funding,
   productName,
-  productAccountHandle,
-  productAccountDid,
 }: {
   funding: FundingDetail | null;
   productName: string;
-  /** Steward's resolved Bluesky handle — preferred for the at.fund profile URL. */
-  productAccountHandle: string | null;
-  /** Steward's DID — fallback for the at.fund profile URL when no handle is set. */
-  productAccountDid: string | null;
 }) {
   if (!funding || !hasActionableFunding(funding)) return null;
 
   return (
-    <Popover
+    <HoverCard
       placement="bottom start"
       trigger={
         <AriaButton
@@ -211,26 +278,17 @@ export function FundingPopoverChip({
       }
       style={styles.popoverSurface}
     >
-      <FundingPopoverContent
-        funding={funding}
-        productName={productName}
-        productAccountHandle={productAccountHandle}
-        productAccountDid={productAccountDid}
-      />
-    </Popover>
+      <FundingPopoverContent funding={funding} productName={productName} />
+    </HoverCard>
   );
 }
 
 function FundingPopoverContent({
   funding,
   productName,
-  productAccountHandle,
-  productAccountDid,
 }: {
   funding: FundingDetail;
   productName: string;
-  productAccountHandle: string | null;
-  productAccountDid: string | null;
 }) {
   const { contribute, channels, plans, dependencies } = funding;
   const channelPlan = buildChannelPlanIndex(plans);
@@ -249,84 +307,74 @@ function FundingPopoverContent({
     contributeUrl != null &&
     !channels.some((channel) => urlsMatch(channel.channelUri, contributeUrl));
   const hasChips = channels.length > 0 || unattachedPlans.length > 0;
-  /**
-   * Deep link to the steward's at.fund profile so people can see the canonical
-   * funding page (with the full channel/plan/graph layout). Handle is preferred for a
-   * human-readable URL; DID is the fallback for stewards whose handle hasn't resolved.
-   */
-  const atFundIdentifier =
-    productAccountHandle?.trim() || productAccountDid?.trim() || null;
-  const atFundProfileHref = atFundIdentifier
-    ? `https://www.at.fund/${atFundIdentifier}`
-    : null;
+  const showLinks = showContributeButton || hasChips;
 
   return (
-    <Flex direction="column" gap="2xl">
-      <Flex align="center" gap="md" justify="between" wrap>
-        <Text size="lg" weight="semibold">
+    <Flex direction="column">
+      <Flex
+        align="center"
+        gap="6xl"
+        justify="between"
+        wrap
+        style={styles.header}
+      >
+        <Text size="base" weight="semibold">
           Funding
         </Text>
-        {atFundProfileHref ? (
+        {contributeUrl && (
           <Button
-            variant="tertiary"
-            size="sm"
-            href={atFundProfileHref}
+            href={contributeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`View ${productName} on at.fund (opens in new tab)`}
+            aria-label={`Fund ${productName} (opens ${contributeUrl} in a new tab)`}
+            size="sm"
+            style={greenTheme as unknown as stylex.StaticStyles}
           >
-            View on at.fund
-            <ExternalLink />
+            <HeartHandshake size={16} />
+            {contribute?.label?.trim() || "Fund"}
           </Button>
-        ) : null}
+        )}
       </Flex>
 
-      {showContributeButton || hasChips ? (
-        <Flex wrap align="center" gap="sm">
-          {/**
-           * Fund button takes the lead in the chips row when the contribute URL adds
-           * info beyond the channel pills — for stewards with no channel records (e.g.
-           * just a `funding.contribute` self) this is the only affordance and replaces
-           * what would otherwise be an empty pills row.
-           */}
-          {showContributeButton ? (
-            <Button
-              variant="secondary"
-              href={contributeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Fund ${productName} (opens ${contributeUrl} in a new tab)`}
-            >
-              <HeartHandshake />
-              {contribute?.label?.trim() || "Fund"}
-            </Button>
-          ) : null}
-          {channels.map((channel) => (
-            <FundingChannelPill
-              key={channel.atUri}
-              channel={channel}
-              plan={channelPlan.get(channel.atUri) ?? null}
-            />
-          ))}
-          {unattachedPlans.map((plan) => (
-            <FundingPlanPill key={plan.atUri} plan={plan} />
-          ))}
-        </Flex>
-      ) : null}
-
-      {dependencies.length > 0 ? (
-        <>
-          <Separator />
-          <Flex direction="column" gap="md">
-            <SmallBody style={styles.sectionLabel}>Depends on</SmallBody>
-            <Flex direction="column" gap="xs">
-              {dependencies.map((dep) => (
-                <FundingDependencyRow key={dep.atUri} dependency={dep} />
+      <Flex direction="column" gap="4xl" style={styles.content}>
+        {showLinks ? (
+          <Flex direction="column" gap="lg">
+            <Flex align="center" gap="sm" style={styles.sectionLabel}>
+              <Package size={14} />
+              Plans
+            </Flex>
+            <Flex direction="column" gap="sm">
+              {channels.map((channel) => (
+                <FundingChannelPill
+                  key={channel.atUri}
+                  channel={channel}
+                  plan={channelPlan.get(channel.atUri) ?? null}
+                />
+              ))}
+              {unattachedPlans.map((plan) => (
+                <FundingPlanPill key={plan.atUri} plan={plan} />
               ))}
             </Flex>
           </Flex>
-        </>
-      ) : null}
+        ) : null}
+
+        {dependencies.length > 0 ? (
+          <>
+            {showLinks && <Separator />}
+            <Flex direction="column" gap="lg">
+              <Flex align="center" gap="sm" style={styles.sectionLabel}>
+                <GitMerge size={14} />
+                Depends on
+              </Flex>
+              <Flex direction="column" gap="xs">
+                {dependencies.map((dep) => (
+                  <FundingDependencyRow key={dep.atUri} dependency={dep} />
+                ))}
+              </Flex>
+            </Flex>
+          </>
+        ) : null}
+      </Flex>
     </Flex>
   );
 }
@@ -347,7 +395,15 @@ function FundingChannelPill({
 
   const inner = (
     <>
-      <span>{label}</span>
+      <Flex align="center" gap="lg" style={styles.grow}>
+        <div {...stylex.props(styles.channelPillIcon)}>
+          <CreditCard size={16} />
+        </div>
+        <Flex gap="xs" direction="column">
+          <span>{label}</span>
+          {channel.description ? <span>{channel.description}</span> : null}
+        </Flex>
+      </Flex>
       {price ? (
         <span {...stylex.props(styles.channelPillPrice)}>{price}</span>
       ) : null}
@@ -430,10 +486,14 @@ function FundingDependencyRow({
         fallback={getInitials(name)}
         src={dependency.avatarUrl ?? undefined}
       />
-      <Text size="base" weight="semibold" style={styles.dependsName}>
-        {name}
-      </Text>
-      <ArrowRight {...stylex.props(styles.arrow)} aria-hidden />
+      <Flex direction="column" gap="lg" style={styles.grow}>
+        <Text size="sm" weight="semibold" style={styles.dependsName}>
+          {name}
+        </Text>
+        <Text size="xs" variant="secondary">
+          @{handle}
+        </Text>
+      </Flex>
     </a>
   );
 }
