@@ -15,6 +15,7 @@ import type {
 
 import * as stylex from "@stylexjs/stylex";
 import { Avatar } from "#/design-system/avatar";
+import { Button } from "#/design-system/button";
 import { Flex } from "#/design-system/flex";
 import { Popover } from "#/design-system/popover";
 import { Separator } from "#/design-system/separator";
@@ -32,8 +33,9 @@ import {
   deriveChannelLabel,
   formatFundingAmount,
 } from "#/lib/atproto/fund-format";
+import { urlsMatch } from "#/lib/atproto/load-funding-summaries";
 import { getInitials } from "#/lib/get-initials";
-import { ArrowRight, HeartHandshake } from "lucide-react";
+import { ArrowRight, ExternalLink, HeartHandshake } from "lucide-react";
 import { Button as AriaButton, Link as AriaLink } from "react-aria-components";
 
 const styles = stylex.create({
@@ -179,9 +181,15 @@ function hasActionableFunding(funding: FundingDetail): boolean {
 export function FundingPopoverChip({
   funding,
   productName,
+  productAccountHandle,
+  productAccountDid,
 }: {
   funding: FundingDetail | null;
   productName: string;
+  /** Steward's resolved Bluesky handle — preferred for the at.fund profile URL. */
+  productAccountHandle: string | null;
+  /** Steward's DID — fallback for the at.fund profile URL when no handle is set. */
+  productAccountDid: string | null;
 }) {
   if (!funding || !hasActionableFunding(funding)) return null;
 
@@ -203,27 +211,96 @@ export function FundingPopoverChip({
       }
       style={styles.popoverSurface}
     >
-      <FundingPopoverContent funding={funding} />
+      <FundingPopoverContent
+        funding={funding}
+        productName={productName}
+        productAccountHandle={productAccountHandle}
+        productAccountDid={productAccountDid}
+      />
     </Popover>
   );
 }
 
-function FundingPopoverContent({ funding }: { funding: FundingDetail }) {
-  const { channels, plans, dependencies } = funding;
+function FundingPopoverContent({
+  funding,
+  productName,
+  productAccountHandle,
+  productAccountDid,
+}: {
+  funding: FundingDetail;
+  productName: string;
+  productAccountHandle: string | null;
+  productAccountDid: string | null;
+}) {
+  const { contribute, channels, plans, dependencies } = funding;
   const channelPlan = buildChannelPlanIndex(plans);
   const unattachedPlans = plans.filter(
     (plan) => plan.channelAtUris.length === 0 && plan.status !== "inactive",
   );
+  /**
+   * Show the contribute button only when the steward's `funding.contribute.url` adds
+   * info beyond the channel pills — either no channels exist or none of them carry the
+   * same URL. Channel URLs that already cover the contribute link would render two
+   * affordances pointing at the same place, so dedupe loosely (trailing slash / case
+   * insensitive) via `urlsMatch`.
+   */
+  const contributeUrl = contribute?.url ?? null;
+  const showContributeButton =
+    contributeUrl != null &&
+    !channels.some((channel) => urlsMatch(channel.channelUri, contributeUrl));
   const hasChips = channels.length > 0 || unattachedPlans.length > 0;
+  /**
+   * Deep link to the steward's at.fund profile so people can see the canonical
+   * funding page (with the full channel/plan/graph layout). Handle is preferred for a
+   * human-readable URL; DID is the fallback for stewards whose handle hasn't resolved.
+   */
+  const atFundIdentifier =
+    productAccountHandle?.trim() || productAccountDid?.trim() || null;
+  const atFundProfileHref = atFundIdentifier
+    ? `https://www.at.fund/${atFundIdentifier}`
+    : null;
 
   return (
     <Flex direction="column" gap="2xl">
-      <Text size="lg" weight="semibold">
-        Funding
-      </Text>
+      <Flex align="center" gap="md" justify="between" wrap>
+        <Text size="lg" weight="semibold">
+          Funding
+        </Text>
+        {atFundProfileHref ? (
+          <Button
+            variant="tertiary"
+            size="sm"
+            href={atFundProfileHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`View ${productName} on at.fund (opens in new tab)`}
+          >
+            View on at.fund
+            <ExternalLink />
+          </Button>
+        ) : null}
+      </Flex>
 
-      {hasChips ? (
-        <Flex wrap gap="sm">
+      {showContributeButton || hasChips ? (
+        <Flex wrap align="center" gap="sm">
+          {/**
+           * Fund button takes the lead in the chips row when the contribute URL adds
+           * info beyond the channel pills — for stewards with no channel records (e.g.
+           * just a `funding.contribute` self) this is the only affordance and replaces
+           * what would otherwise be an empty pills row.
+           */}
+          {showContributeButton ? (
+            <Button
+              variant="secondary"
+              href={contributeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Fund ${productName} (opens ${contributeUrl} in a new tab)`}
+            >
+              <HeartHandshake />
+              {contribute?.label?.trim() || "Fund"}
+            </Button>
+          ) : null}
           {channels.map((channel) => (
             <FundingChannelPill
               key={channel.atUri}
@@ -322,8 +399,9 @@ function FundingPlanPill({ plan }: { plan: FundingPlanView }) {
 
 /**
  * "Depends on" row — avatar + handle/displayName + arrow. Clicks open the upstream
- * entity's Bluesky profile (no in-store DID detail page yet; if a matching listing
- * exists later, swap to a router link).
+ * entity's at.fund profile so people land on the steward's funding page (with all
+ * their channels/plans) rather than their generic Bluesky profile. Prefers handle
+ * when resolved so the URL is human-readable; falls back to the DID otherwise.
  */
 function FundingDependencyRow({
   dependency,
@@ -336,16 +414,14 @@ function FundingDependencyRow({
     dependency.handle?.trim() ||
     dependency.subjectDid;
   const handle = dependency.handle?.trim();
-  const href = handle
-    ? `https://bsky.app/profile/${handle}`
-    : `https://bsky.app/profile/${dependency.subjectDid}`;
+  const href = `https://www.at.fund/${handle || dependency.subjectDid}`;
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`${name} on Bluesky (opens in new tab)`}
+      aria-label={`${name} on at.fund (opens in new tab)`}
       {...stylex.props(styles.dependsRow)}
     >
       <Avatar

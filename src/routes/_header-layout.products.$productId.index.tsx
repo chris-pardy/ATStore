@@ -585,6 +585,8 @@ function ListingLinksRow({
   germDmHref,
   fundingDetail,
   productName,
+  productAccountHandle,
+  productAccountDid,
   devListingId,
   devListingSlug,
 }: {
@@ -594,6 +596,9 @@ function ListingLinksRow({
   germDmHref: string | null | undefined;
   fundingDetail: FundingDetail | null;
   productName: string;
+  /** Steward identity passed to `<FundingPopoverChip/>` for its at.fund deep link. */
+  productAccountHandle: string | null;
+  productAccountDid: string | null;
   devListingId?: string;
   devListingSlug?: string | null;
 }) {
@@ -659,7 +664,12 @@ function ListingLinksRow({
         />
       ) : null}
       {showFundingChip ? (
-        <FundingPopoverChip funding={fundingDetail} productName={productName} />
+        <FundingPopoverChip
+          funding={fundingDetail}
+          productName={productName}
+          productAccountHandle={productAccountHandle}
+          productAccountDid={productAccountDid}
+        />
       ) : null}
       {germHrefChip ? <GermNetworkBadge href={germHrefChip} /> : null}
     </Flex>
@@ -847,6 +857,8 @@ function ProductPage() {
           germDmHref={listing.germDmHref}
           fundingDetail={listing.fundingDetail}
           productName={listing.name}
+          productAccountHandle={listing.productAccountHandle}
+          productAccountDid={listing.productAccountDid}
           devListingId={listing.id}
           devListingSlug={productSlug}
         />
