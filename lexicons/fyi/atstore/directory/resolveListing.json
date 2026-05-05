@@ -1,0 +1,37 @@
+{
+  "lexicon": 1,
+  "id": "fyi.atstore.directory.resolveListing",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Resolve a storefront external URL to a directory listing when uniquely matched.",
+      "parameters": {
+        "type": "params",
+        "required": ["externalUrl"],
+        "properties": {
+          "externalUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Listing external_url / product URL as stored on the record."
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["listingId", "slug"],
+          "properties": {
+            "listingId": { "type": "string", "maxLength": 64 },
+            "slug": { "type": "string", "maxLength": 640 },
+            "atUri": { "type": "string", "maxLength": 2560, "nullable": true }
+          }
+        }
+      },
+      "errors": [
+        { "name": "ListingNotFound" },
+        { "name": "AmbiguousResolution" }
+      ]
+    }
+  }
+}

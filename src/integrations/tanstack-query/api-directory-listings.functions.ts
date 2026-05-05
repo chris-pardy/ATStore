@@ -6699,6 +6699,17 @@ const createStoreManagedListing = createServerFn({ method: "POST" })
     return { uri, slug };
   });
 
+/** Server-only helpers shared with AT Store XRPC handlers. */
+export const directoryListingXrpcHelpers = {
+  listingPublicWhere,
+  getListingSelect,
+  orderByPopularListingSort,
+  toListingCard,
+  computeIsStoreManaged,
+  viewerMayReplyOnListingReview,
+  normalizeListingLinks,
+} as const;
+
 export const directoryListingApi = {
   getHomePageData,
   getHomePageQueryOptions,

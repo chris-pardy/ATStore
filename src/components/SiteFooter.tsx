@@ -8,10 +8,11 @@ const FooterLink = createLink(Link);
 
 const FOOTER_LINK_GROUPS = [
   {
-    links: [
+      links: [
       { href: "/about", label: "About" },
       { href: "/home", label: "Home" },
       { href: "/search", label: "Search" },
+      { href: "/developers/atproto", label: "Developer API" },
       { href: "/products/manage", label: "Manage listings" },
     ],
   },

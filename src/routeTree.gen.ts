@@ -15,6 +15,7 @@ import { Route as HeaderLayoutRouteImport } from './routes/_header-layout'
 import { Route as LocaleRouteImport } from './routes/$locale'
 import { Route as OgIndexRouteImport } from './routes/og.index'
 import { Route as HeaderLayoutIndexRouteImport } from './routes/_header-layout.index'
+import { Route as XrpcNsidRouteImport } from './routes/xrpc.$nsid'
 import { Route as OgTagRouteImport } from './routes/og.tag'
 import { Route as OgReviewRouteImport } from './routes/og.review'
 import { Route as OgProfileRouteImport } from './routes/og.profile'
@@ -26,6 +27,7 @@ import { Route as HeaderLayoutProfileActorRouteImport } from './routes/_header-l
 import { Route as HeaderLayoutProductsManageRouteImport } from './routes/_header-layout.products.manage'
 import { Route as HeaderLayoutProductsCreateRouteImport } from './routes/_header-layout.products.create'
 import { Route as HeaderLayoutProductClaimRouteImport } from './routes/_header-layout.product.claim'
+import { Route as HeaderLayoutDevelopersAtprotoRouteImport } from './routes/_header-layout.developers.atproto'
 import { Route as HeaderLayoutCategoriesCategoryIdRouteImport } from './routes/_header-layout.categories.$categoryId'
 import { Route as HeaderLayoutAppsTagsRouteImport } from './routes/_header-layout.apps.tags'
 import { Route as HeaderLayoutAppsAllRouteImport } from './routes/_header-layout.apps.all'
@@ -82,6 +84,11 @@ const HeaderLayoutIndexRoute = HeaderLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HeaderLayoutRoute,
+} as any)
+const XrpcNsidRoute = XrpcNsidRouteImport.update({
+  id: '/xrpc/$nsid',
+  path: '/xrpc/$nsid',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OgTagRoute = OgTagRouteImport.update({
   id: '/og/tag',
@@ -140,6 +147,12 @@ const HeaderLayoutProductClaimRoute =
   HeaderLayoutProductClaimRouteImport.update({
     id: '/product/claim',
     path: '/product/claim',
+    getParentRoute: () => HeaderLayoutRoute,
+  } as any)
+const HeaderLayoutDevelopersAtprotoRoute =
+  HeaderLayoutDevelopersAtprotoRouteImport.update({
+    id: '/developers/atproto',
+    path: '/developers/atproto',
     getParentRoute: () => HeaderLayoutRoute,
   } as any)
 const HeaderLayoutCategoriesCategoryIdRoute =
@@ -310,11 +323,13 @@ export interface FileRoutesByFullPath {
   '/og/profile': typeof OgProfileRoute
   '/og/review': typeof OgReviewRoute
   '/og/tag': typeof OgTagRoute
+  '/xrpc/$nsid': typeof XrpcNsidRoute
   '/og/': typeof OgIndexRoute
   '/apps/$tag': typeof HeaderLayoutAppsTagRoute
   '/apps/all': typeof HeaderLayoutAppsAllRoute
   '/apps/tags': typeof HeaderLayoutAppsTagsRoute
   '/categories/$categoryId': typeof HeaderLayoutCategoriesCategoryIdRoute
+  '/developers/atproto': typeof HeaderLayoutDevelopersAtprotoRoute
   '/product/claim': typeof HeaderLayoutProductClaimRoute
   '/products/create': typeof HeaderLayoutProductsCreateRoute
   '/products/manage': typeof HeaderLayoutProductsManageRoute
@@ -354,11 +369,13 @@ export interface FileRoutesByTo {
   '/og/profile': typeof OgProfileRoute
   '/og/review': typeof OgReviewRoute
   '/og/tag': typeof OgTagRoute
+  '/xrpc/$nsid': typeof XrpcNsidRoute
   '/og': typeof OgIndexRoute
   '/apps/$tag': typeof HeaderLayoutAppsTagRoute
   '/apps/all': typeof HeaderLayoutAppsAllRoute
   '/apps/tags': typeof HeaderLayoutAppsTagsRoute
   '/categories/$categoryId': typeof HeaderLayoutCategoriesCategoryIdRoute
+  '/developers/atproto': typeof HeaderLayoutDevelopersAtprotoRoute
   '/product/claim': typeof HeaderLayoutProductClaimRoute
   '/products/create': typeof HeaderLayoutProductsCreateRoute
   '/products/manage': typeof HeaderLayoutProductsManageRoute
@@ -399,12 +416,14 @@ export interface FileRoutesById {
   '/og/profile': typeof OgProfileRoute
   '/og/review': typeof OgReviewRoute
   '/og/tag': typeof OgTagRoute
+  '/xrpc/$nsid': typeof XrpcNsidRoute
   '/_header-layout/': typeof HeaderLayoutIndexRoute
   '/og/': typeof OgIndexRoute
   '/_header-layout/apps/$tag': typeof HeaderLayoutAppsTagRoute
   '/_header-layout/apps/all': typeof HeaderLayoutAppsAllRoute
   '/_header-layout/apps/tags': typeof HeaderLayoutAppsTagsRoute
   '/_header-layout/categories/$categoryId': typeof HeaderLayoutCategoriesCategoryIdRoute
+  '/_header-layout/developers/atproto': typeof HeaderLayoutDevelopersAtprotoRoute
   '/_header-layout/product/claim': typeof HeaderLayoutProductClaimRoute
   '/_header-layout/products/create': typeof HeaderLayoutProductsCreateRoute
   '/_header-layout/products/manage': typeof HeaderLayoutProductsManageRoute
@@ -446,11 +465,13 @@ export interface FileRouteTypes {
     | '/og/profile'
     | '/og/review'
     | '/og/tag'
+    | '/xrpc/$nsid'
     | '/og/'
     | '/apps/$tag'
     | '/apps/all'
     | '/apps/tags'
     | '/categories/$categoryId'
+    | '/developers/atproto'
     | '/product/claim'
     | '/products/create'
     | '/products/manage'
@@ -490,11 +511,13 @@ export interface FileRouteTypes {
     | '/og/profile'
     | '/og/review'
     | '/og/tag'
+    | '/xrpc/$nsid'
     | '/og'
     | '/apps/$tag'
     | '/apps/all'
     | '/apps/tags'
     | '/categories/$categoryId'
+    | '/developers/atproto'
     | '/product/claim'
     | '/products/create'
     | '/products/manage'
@@ -534,12 +557,14 @@ export interface FileRouteTypes {
     | '/og/profile'
     | '/og/review'
     | '/og/tag'
+    | '/xrpc/$nsid'
     | '/_header-layout/'
     | '/og/'
     | '/_header-layout/apps/$tag'
     | '/_header-layout/apps/all'
     | '/_header-layout/apps/tags'
     | '/_header-layout/categories/$categoryId'
+    | '/_header-layout/developers/atproto'
     | '/_header-layout/product/claim'
     | '/_header-layout/products/create'
     | '/_header-layout/products/manage'
@@ -577,6 +602,7 @@ export interface RootRouteChildren {
   OgProfileRoute: typeof OgProfileRoute
   OgReviewRoute: typeof OgReviewRoute
   OgTagRoute: typeof OgTagRoute
+  XrpcNsidRoute: typeof XrpcNsidRoute
   OgIndexRoute: typeof OgIndexRoute
   ApiAuthAtprotoAuthorizeRoute: typeof ApiAuthAtprotoAuthorizeRoute
   ApiAuthAtprotoCallbackRoute: typeof ApiAuthAtprotoCallbackRoute
@@ -628,6 +654,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof HeaderLayoutIndexRouteImport
       parentRoute: typeof HeaderLayoutRoute
+    }
+    '/xrpc/$nsid': {
+      id: '/xrpc/$nsid'
+      path: '/xrpc/$nsid'
+      fullPath: '/xrpc/$nsid'
+      preLoaderRoute: typeof XrpcNsidRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/og/tag': {
       id: '/og/tag'
@@ -704,6 +737,13 @@ declare module '@tanstack/react-router' {
       path: '/product/claim'
       fullPath: '/product/claim'
       preLoaderRoute: typeof HeaderLayoutProductClaimRouteImport
+      parentRoute: typeof HeaderLayoutRoute
+    }
+    '/_header-layout/developers/atproto': {
+      id: '/_header-layout/developers/atproto'
+      path: '/developers/atproto'
+      fullPath: '/developers/atproto'
+      preLoaderRoute: typeof HeaderLayoutDevelopersAtprotoRouteImport
       parentRoute: typeof HeaderLayoutRoute
     }
     '/_header-layout/categories/$categoryId': {
@@ -978,6 +1018,7 @@ interface HeaderLayoutRouteChildren {
   HeaderLayoutAppsAllRoute: typeof HeaderLayoutAppsAllRoute
   HeaderLayoutAppsTagsRoute: typeof HeaderLayoutAppsTagsRoute
   HeaderLayoutCategoriesCategoryIdRoute: typeof HeaderLayoutCategoriesCategoryIdRoute
+  HeaderLayoutDevelopersAtprotoRoute: typeof HeaderLayoutDevelopersAtprotoRoute
   HeaderLayoutProductClaimRoute: typeof HeaderLayoutProductClaimRoute
   HeaderLayoutProductsCreateRoute: typeof HeaderLayoutProductsCreateRoute
   HeaderLayoutProductsManageRoute: typeof HeaderLayoutProductsManageRoute
@@ -999,6 +1040,7 @@ const HeaderLayoutRouteChildren: HeaderLayoutRouteChildren = {
   HeaderLayoutAppsAllRoute: HeaderLayoutAppsAllRoute,
   HeaderLayoutAppsTagsRoute: HeaderLayoutAppsTagsRoute,
   HeaderLayoutCategoriesCategoryIdRoute: HeaderLayoutCategoriesCategoryIdRoute,
+  HeaderLayoutDevelopersAtprotoRoute: HeaderLayoutDevelopersAtprotoRoute,
   HeaderLayoutProductClaimRoute: HeaderLayoutProductClaimRoute,
   HeaderLayoutProductsCreateRoute: HeaderLayoutProductsCreateRoute,
   HeaderLayoutProductsManageRoute: HeaderLayoutProductsManageRoute,
@@ -1027,6 +1069,7 @@ const rootRouteChildren: RootRouteChildren = {
   OgProfileRoute: OgProfileRoute,
   OgReviewRoute: OgReviewRoute,
   OgTagRoute: OgTagRoute,
+  XrpcNsidRoute: XrpcNsidRoute,
   OgIndexRoute: OgIndexRoute,
   ApiAuthAtprotoAuthorizeRoute: ApiAuthAtprotoAuthorizeRoute,
   ApiAuthAtprotoCallbackRoute: ApiAuthAtprotoCallbackRoute,

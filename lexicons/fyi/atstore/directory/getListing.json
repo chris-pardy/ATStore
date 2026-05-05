@@ -1,0 +1,117 @@
+{
+  "lexicon": 1,
+  "id": "fyi.atstore.directory.getListing",
+  "defs": {
+    "listingCardGet": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "tagline",
+        "description",
+        "category",
+        "accent",
+        "reviewCount",
+        "priceLabel",
+        "appTags",
+        "categorySlugs"
+      ],
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 640 },
+        "slug": { "type": "string", "maxLength": 640 },
+        "tagline": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 20000 },
+        "iconUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "heroImageUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "categorySlug": { "type": "string", "maxLength": 512, "nullable": true },
+        "categorySlugs": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 512 }
+        },
+        "category": { "type": "string", "maxLength": 640 },
+        "accent": {
+          "type": "string",
+          "maxLength": 16,
+          "knownValues": ["blue", "pink", "purple", "green"]
+        },
+        "rating": {
+          "type": "string",
+          "maxLength": 16,
+          "nullable": true
+        },
+        "reviewCount": { "type": "integer" },
+        "priceLabel": { "type": "string", "maxLength": 32 },
+        "productAccountHandle": { "type": "string", "maxLength": 512, "nullable": true },
+        "appTags": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "listingLinkRow": {
+      "type": "object",
+      "required": ["uri"],
+      "properties": {
+        "label": { "type": "string", "maxLength": 640 },
+        "uri": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "listingDetailResponse": {
+      "type": "object",
+      "required": ["listing", "isStoreManaged"],
+      "properties": {
+        "listing": {
+          "type": "ref",
+          "ref": "#listingCardGet"
+        },
+        "atUri": { "type": "string", "maxLength": 2560, "nullable": true },
+        "isStoreManaged": { "type": "boolean" },
+        "repoDid": { "type": "string", "maxLength": 2048, "nullable": true },
+        "productAccountDid": { "type": "string", "maxLength": 2048, "nullable": true },
+        "sourceTagline": { "type": "string", "maxLength": 20000, "nullable": true },
+        "sourceFullDescription": { "type": "string", "maxLength": 20000, "nullable": true },
+        "screenshots": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 4096 }
+        },
+        "externalUrl": { "type": "string", "maxLength": 2048, "nullable": true },
+        "sourceUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "createdAt": { "type": "string", "maxLength": 64, "nullable": true },
+        "updatedAt": { "type": "string", "maxLength": 64, "nullable": true },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "ref",
+            "ref": "#listingLinkRow"
+          }
+        }
+      }
+    },
+    "main": {
+      "type": "query",
+      "description": "Fetch one public verified listing by stable Postgres id (UUID) or by URL slug.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "listingId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 640
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "#listingDetailResponse"
+        }
+      },
+      "errors": [{ "name": "ListingNotFound" }, { "name": "InvalidParams" }]
+    }
+  }
+}
