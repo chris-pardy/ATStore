@@ -1,12 +1,12 @@
 {
   "lexicon": 1,
   "id": "fyi.atstore.authThirdPartyReviews",
-  "description": "OAuth permission bundle for third-party apps that let users submit AT Store listing reviews (profile bootstrap + review create + submitReview RPC).",
+  "description": "OAuth permission bundle for third-party apps that publish AT Store profile self plus listing reviews on the user's repo; reads use public directory XRPC.",
   "defs": {
     "main": {
       "type": "permission-set",
       "title": "Submit AT Store reviews",
-      "detail": "Ensure fyi.atstore.profile/self exists (first-login parity), create listing reviews on the user's repo, and call the at-store submitReview API using delegated auth.",
+      "detail": "Create fyi.atstore.profile/self when needed and fyi.atstore.listing.review records on the user's PDS via repository APIs; read public directory data via XRPC queries.",
       "permissions": [
         {
           "type": "permission",
@@ -19,12 +19,6 @@
           "resource": "repo",
           "collection": ["fyi.atstore.listing.review"],
           "action": ["create"]
-        },
-        {
-          "type": "permission",
-          "resource": "rpc",
-          "inheritAud": true,
-          "lxm": ["fyi.atstore.reviews.submitReview"]
         }
       ]
     }

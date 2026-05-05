@@ -32,12 +32,12 @@ export const lexicons = [
   {
     "lexicon": 1,
     "id": "fyi.atstore.authThirdPartyReviews",
-    "description": "OAuth permission bundle for third-party apps that let users submit AT Store listing reviews (profile bootstrap + review create + submitReview RPC).",
+    "description": "OAuth permission bundle for third-party apps that publish AT Store profile self plus listing reviews on the user's repo; reads use public directory XRPC.",
     "defs": {
       "main": {
         "type": "permission-set",
         "title": "Submit AT Store reviews",
-        "detail": "Ensure fyi.atstore.profile/self exists (first-login parity), create listing reviews on the user's repo, and call the at-store submitReview API using delegated auth.",
+        "detail": "Create fyi.atstore.profile/self when needed and fyi.atstore.listing.review records on the user's PDS via repository APIs; read public directory data via XRPC queries.",
         "permissions": [
           {
             "type": "permission",
@@ -57,14 +57,6 @@ export const lexicons = [
             ],
             "action": [
               "create"
-            ]
-          },
-          {
-            "type": "permission",
-            "resource": "rpc",
-            "inheritAud": true,
-            "lxm": [
-              "fyi.atstore.reviews.submitReview"
             ]
           }
         ]
@@ -953,92 +945,6 @@ export const lexicons = [
   },
   {
     "lexicon": 1,
-    "id": "fyi.atstore.reviews.submitReview",
-    "defs": {
-      "main": {
-        "type": "procedure",
-        "description": "Create a fyi.atstore.listing.review record on the authenticated user's PDS and mirror it into the directory index. Prefer standard com.atproto.repo.createRecord when not using this proxy.",
-        "input": {
-          "encoding": "application/json",
-          "schema": {
-            "type": "object",
-            "required": [
-              "subject",
-              "rating",
-              "createdAt"
-            ],
-            "properties": {
-              "subject": {
-                "type": "string",
-                "format": "at-uri",
-                "description": "AT URI of the fyi.atstore.listing.detail record."
-              },
-              "rating": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 5
-              },
-              "text": {
-                "type": "string",
-                "maxLength": 8000,
-                "description": "Optional written review."
-              },
-              "createdAt": {
-                "type": "string",
-                "format": "datetime"
-              }
-            }
-          }
-        },
-        "output": {
-          "encoding": "application/json",
-          "schema": {
-            "type": "object",
-            "required": [
-              "uri",
-              "cid",
-              "reviewId"
-            ],
-            "properties": {
-              "uri": {
-                "type": "string",
-                "format": "at-uri",
-                "maxLength": 2560
-              },
-              "cid": {
-                "type": "string",
-                "maxLength": 128
-              },
-              "reviewId": {
-                "type": "string",
-                "maxLength": 64,
-                "description": "Directory mirror UUID for the review row."
-              }
-            }
-          }
-        },
-        "errors": [
-          {
-            "name": "Unauthorized"
-          },
-          {
-            "name": "ListingNotFound"
-          },
-          {
-            "name": "AlreadyReviewed"
-          },
-          {
-            "name": "InvalidSubject"
-          },
-          {
-            "name": "ListingNotOnNetwork"
-          }
-        ]
-      }
-    }
-  },
-  {
-    "lexicon": 1,
     "id": "fyi.atstore.server.describe",
     "defs": {
       "main": {
@@ -1055,7 +961,7 @@ export const lexicons = [
             "required": [
               "service",
               "publicReads",
-              "oauthSubmitReview",
+              "reviewsWrittenOnAuthorRepo",
               "defaultListingLimit",
               "maxListingLimit",
               "maxReviewLimit",
@@ -1069,8 +975,9 @@ export const lexicons = [
               "publicReads": {
                 "type": "boolean"
               },
-              "oauthSubmitReview": {
-                "type": "boolean"
+              "reviewsWrittenOnAuthorRepo": {
+                "type": "boolean",
+                "description": "When true, listing reviews are created via com.atproto.repo.createRecord on the author's PDS (fyi.atstore.listing.review); this service does not expose a write procedure for reviews."
               },
               "defaultListingLimit": {
                 "type": "integer"

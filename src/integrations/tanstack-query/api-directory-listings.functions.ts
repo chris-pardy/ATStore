@@ -33,6 +33,7 @@ import {
   createListingReviewRecord,
   createListingReviewReplyRecord,
   deleteRecord,
+  ensureProfileSelfRecord,
   fetchListingDetailRecord,
   putListingFavoriteRecord,
   putListingReviewRecord,
@@ -3264,6 +3265,27 @@ const createDirectoryListingReview = createServerFn({ method: "POST" })
 
     if (existing) {
       throw new Error("You already reviewed this listing.");
+    }
+
+    try {
+      const publicProfile = await fetchBlueskyPublicProfileFields(session.did);
+      const handle =
+        publicProfile?.handle?.trim() && publicProfile.handle.trim().length > 0
+          ? publicProfile.handle.trim()
+          : "";
+      const displayName =
+        publicProfile?.displayName?.trim() ||
+        handle ||
+        session.session.user.name.trim() ||
+        session.did;
+      await ensureProfileSelfRecord(session.client, session.did, {
+        displayName,
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to ensure fyi.atstore.profile record before listing review:",
+        error,
+      );
     }
 
     const createdAt = new Date().toISOString();

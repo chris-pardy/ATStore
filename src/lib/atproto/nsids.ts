@@ -12,7 +12,6 @@ export const NSID = {
   directoryGetListing: "fyi.atstore.directory.getListing",
   directoryResolveListing: "fyi.atstore.directory.resolveListing",
   reviewsListForListing: "fyi.atstore.reviews.listForListing",
-  reviewsSubmitReview: "fyi.atstore.reviews.submitReview",
   serverDescribe: "fyi.atstore.server.describe",
 } as const;
 
@@ -22,7 +21,6 @@ export const ATSTORE_XRPC_METHOD = {
   directoryGetListing: NSID.directoryGetListing,
   directoryResolveListing: NSID.directoryResolveListing,
   reviewsListForListing: NSID.reviewsListForListing,
-  reviewsSubmitReview: NSID.reviewsSubmitReview,
   serverDescribe: NSID.serverDescribe,
 } as const;
 

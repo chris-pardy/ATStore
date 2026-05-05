@@ -16,7 +16,7 @@
           "required": [
             "service",
             "publicReads",
-            "oauthSubmitReview",
+            "reviewsWrittenOnAuthorRepo",
             "defaultListingLimit",
             "maxListingLimit",
             "maxReviewLimit",
@@ -28,7 +28,10 @@
               "maxLength": 256
             },
             "publicReads": { "type": "boolean" },
-            "oauthSubmitReview": { "type": "boolean" },
+            "reviewsWrittenOnAuthorRepo": {
+              "type": "boolean",
+              "description": "When true, listing reviews are created via com.atproto.repo.createRecord on the author's PDS (fyi.atstore.listing.review); this service does not expose a write procedure for reviews."
+            },
             "defaultListingLimit": { "type": "integer" },
             "maxListingLimit": { "type": "integer" },
             "maxReviewLimit": { "type": "integer" },

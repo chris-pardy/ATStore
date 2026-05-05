@@ -20,6 +20,8 @@ import {
   Body,
   Heading2,
   Heading3,
+  InlineCode,
+  Pre,
 } from "#/design-system/typography";
 import { Text } from "#/design-system/typography/text";
 import { ATSTORE_XRPC_METHOD, NSID } from "#/lib/atproto/nsids";
@@ -27,7 +29,7 @@ import { buildRouteOgMeta } from "#/lib/og-meta";
 
 const METHOD_ROWS: ReadonlyArray<{
   nsid: string;
-  method: "GET" | "POST";
+  method: "GET";
   summary: string;
 }> = [
   {
@@ -43,7 +45,8 @@ const METHOD_ROWS: ReadonlyArray<{
   {
     nsid: ATSTORE_XRPC_METHOD.directoryGetListing,
     method: "GET",
-    summary: "Detail projection by `listingId` or `slug`.",
+    summary:
+      "Detail projection by `listingId` or `slug` (includes listing `atUri`).",
   },
   {
     nsid: ATSTORE_XRPC_METHOD.directoryResolveListing,
@@ -53,13 +56,8 @@ const METHOD_ROWS: ReadonlyArray<{
   {
     nsid: ATSTORE_XRPC_METHOD.reviewsListForListing,
     method: "GET",
-    summary: "Reviews for a listing (`listingId`, pagination).",
-  },
-  {
-    nsid: ATSTORE_XRPC_METHOD.reviewsSubmitReview,
-    method: "POST",
     summary:
-      "Create a listing review via the user PDS (requires signed-in at-store session cookie today).",
+      "Reviews for a listing (`listingId`, pagination); mirrored Tap index.",
   },
 ];
 
@@ -92,6 +90,10 @@ const styles = stylex.create({
   methodsTable: {
     width: "100%",
   },
+  pre: {
+    marginBottom: 0,
+    marginTop: 0,
+  },
 });
 
 export const Route = createFileRoute("/_header-layout/developers/atproto")({
@@ -99,7 +101,7 @@ export const Route = createFileRoute("/_header-layout/developers/atproto")({
     buildRouteOgMeta({
       title: "AT Protocol API | at-store",
       description:
-        "AT Store XRPC methods and OAuth permission bundle for third-party review integrations.",
+        "Public AT Store directory XRPC endpoints and listing-review integration.",
     }),
   component: DevelopersAtprotoPage,
 });
@@ -116,11 +118,8 @@ function DevelopersAtprotoPage() {
         <Flex direction="column" gap="6xl">
           <Heading2>AT Protocol on AT Store</Heading2>
           <Body variant="secondary">
-            Directory queries are public GET endpoints under{" "}
-            <Text weight="medium">/xrpc/&lt;nsid&gt;</Text>, shaped by the{" "}
-            <Link href="https://atproto.com/specs/xrpc">XRPC</Link> and{" "}
-            <Link href="https://atproto.com/specs/lexicon">Lexicon</Link> specs.
-            Lexicon JSON lives in this repository under{" "}
+            Public GET endpoints under{" "}
+            <Text weight="medium">/xrpc/&lt;nsid&gt;</Text>. Lexicons:{" "}
             <Text weight="medium">lexicons/fyi/atstore/</Text>.
           </Body>
         </Flex>
@@ -166,43 +165,68 @@ function DevelopersAtprotoPage() {
           </Table>
         </Flex>
 
-        <Flex direction="column" gap="4xl">
-          <Heading3>Third-party review OAuth bundle</Heading3>
+        <Flex direction="column" gap="5xl">
+          <Heading3>Listing reviews</Heading3>
           <Body variant="secondary">
-            Published permission-set lexicon{" "}
-            <Text weight="medium">{NSID.authThirdPartyReviews}</Text> grants{" "}
-            <Text weight="medium">repo:create</Text> on{" "}
-            <Text weight="medium">{NSID.profile}</Text> and{" "}
-            <Text weight="medium">{NSID.listingReview}</Text>, plus{" "}
-            <Text weight="medium">rpc</Text> access (with{" "}
-            <Text weight="medium">inheritAud</Text>) to{" "}
-            <Text weight="medium">
-              {ATSTORE_XRPC_METHOD.reviewsSubmitReview}
-            </Text>
-            . Third-party apps request it using an{" "}
-            <Link href="https://atproto.com/specs/permission">
-              include scope
-            </Link>{" "}
-            such as:
-          </Body>
-          <Blockquote>
-            <code>{`include:${NSID.authThirdPartyReviews}?aud=<resource-service-did#fragment>`}</code>
-          </Blockquote>
-          <Body variant="secondary">
-            The aud fragment must match your deployment&apos;s OAuth protected
-            resource metadata. Blob uploads are{" "}
-            <Link href="https://atproto.com/specs/permission">not bundled</Link>
-            ; apps still need explicit <Text weight="medium">blob:</Text> scopes
-            when uploading media to a PDS.
-          </Body>
-          <Body variant="secondary">
-            Today <Text weight="medium">submitReview</Text> authenticates with
-            the same signed-in browser session as the web app (cookie). Pure
-            bearer-token clients should fall back to{" "}
+            Reviews are written with{" "}
             <Text weight="medium">com.atproto.repo.createRecord</Text> on the
-            user&apos;s PDS using the review lexicon until bearer verification
-            lands here.
+            author&apos;s PDS (
+            <Link href="https://atproto.com/specs/repository">repository</Link>
+            ). Use{" "}
+            <span {...stylex.props(styles.monoTight)}>
+              {ATSTORE_XRPC_METHOD.directoryGetListing}
+            </span>{" "}
+            for the listing detail <Text weight="medium">atUri</Text>; use it as{" "}
+            <Text weight="medium">subject</Text> on a new{" "}
+            <span {...stylex.props(styles.monoTight)}>
+              {NSID.listingReview}
+            </span>{" "}
+            record.
           </Body>
+          <Body variant="secondary">
+            The author&apos;s repo must include{" "}
+            <span {...stylex.props(styles.monoTight)}>{NSID.profile}</span> at
+            record key <Text weight="medium">self</Text>
+            —directory ingestion does not pick up{" "}
+            <span {...stylex.props(styles.monoTight)}>
+              {NSID.listingReview}
+            </span>{" "}
+            records until that profile exists.
+          </Body>
+          <Body variant="secondary">
+            Example <Text weight="medium">record</Text> (omit{" "}
+            <Text weight="medium">text</Text> for stars-only):
+          </Body>
+          <Pre style={styles.pre}>
+            <InlineCode>
+              {`{
+  "$type": "${NSID.listingReview}",
+  "subject": "at://…/${NSID.listingDetail}/…",
+  "rating": 4,
+  "createdAt": "2026-05-04T12:00:00.000Z",
+  "text": "Optional prose."
+}`}
+            </InlineCode>
+          </Pre>
+          <Blockquote>
+            <Text leading="base">
+              Permission-set{" "}
+              <span {...stylex.props(styles.monoTight)}>
+                {NSID.authThirdPartyReviews}
+              </span>{" "}
+              bundles <Text weight="medium">repo:create</Text> on{" "}
+              <span {...stylex.props(styles.monoTight)}>{NSID.profile}</span>{" "}
+              and{" "}
+              <span {...stylex.props(styles.monoTight)}>
+                {NSID.listingReview}
+              </span>{" "}
+              (
+              <Link href="https://atproto.com/specs/permission">
+                permissions
+              </Link>
+              ).
+            </Text>
+          </Blockquote>
         </Flex>
       </Flex>
     </Page.Root>

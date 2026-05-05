@@ -1,20 +1,13 @@
-import type { Client } from "@atcute/client";
 import type { DirectoryListingCard } from "#/integrations/tanstack-query/api-directory-listings.functions";
 import type { ListingLink } from "#/lib/atproto/listing-record";
 
 import { db } from "#/db/index.server";
 import * as schema from "#/db/schema";
 import { directoryListingXrpcHelpers } from "#/integrations/tanstack-query/api-directory-listings.functions";
-import { parseAtUriParts } from "#/lib/atproto/at-uri";
-import { ATSTORE_XRPC_METHOD, NSID } from "#/lib/atproto/nsids";
-import {
-  createListingReviewRecord,
-  ensureProfileSelfRecord,
-} from "#/lib/atproto/repo-records";
-import { upsertListingReviewFromTap } from "#/lib/atproto/tap-review-sync";
+import { ATSTORE_XRPC_METHOD } from "#/lib/atproto/nsids";
 import { fetchBlueskyPublicProfileFields } from "#/lib/bluesky-public-profile";
 import { getAtprotoSessionForRequest } from "#/middleware/auth";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 const LEGACY_DETAIL_SQL = {
   rawCategoryHint: sql<string | null>`null::text`.as("rawCategoryHint"),
@@ -105,7 +98,7 @@ async function handleDescribe() {
   return xrpcJson({
     service: "at-store-directory",
     publicReads: true,
-    oauthSubmitReview: true,
+    reviewsWrittenOnAuthorRepo: true,
     defaultListingLimit: 24,
     maxListingLimit: 100,
     maxReviewLimit: 100,
@@ -449,175 +442,6 @@ async function handleListReviews(url: URL, request: Request) {
   });
 }
 
-/**
- * Mirror OAuth callback: create `fyi.atstore.profile` / `self` when missing so
- * reviewers who never hit `/api/auth/atproto/callback` still get first-login
- * repo state (requires delegated `repo:create` on `fyi.atstore.profile`).
- */
-async function ensureReviewerProfileLikeFirstLogin(session: {
-  did: string;
-  client: Client;
-  session: { user: { name: string } };
-}): Promise<void> {
-  try {
-    const publicProfile = await fetchBlueskyPublicProfileFields(session.did);
-    const handle =
-      publicProfile?.handle?.trim() && publicProfile.handle.trim().length > 0
-        ? publicProfile.handle.trim()
-        : "";
-    const displayName =
-      publicProfile?.displayName?.trim() ||
-      handle ||
-      session.session.user.name.trim() ||
-      session.did;
-    await ensureProfileSelfRecord(session.client, session.did, {
-      displayName,
-    });
-  } catch (error) {
-    console.warn(
-      "Failed to ensure fyi.atstore.profile record during submitReview:",
-      error,
-    );
-  }
-}
-
-async function handleSubmitReview(request: Request) {
-  const session = await getAtprotoSessionForRequest(request);
-  if (!session) {
-    return xrpcErr(401, "Unauthorized");
-  }
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return xrpcErr(400, "InvalidParams", "JSON body required.");
-  }
-
-  if (!body || typeof body !== "object") {
-    return xrpcErr(400, "InvalidParams");
-  }
-
-  const rec = body as Record<string, unknown>;
-  const subject = typeof rec.subject === "string" ? rec.subject.trim() : "";
-  const rating = rec.rating;
-  const text =
-    typeof rec.text === "string" ? rec.text : rec.text == null ? "" : null;
-
-  if (!subject || typeof rating !== "number" || !Number.isInteger(rating)) {
-    return xrpcErr(400, "InvalidParams");
-  }
-  if (rating < 1 || rating > 5) {
-    return xrpcErr(400, "InvalidParams");
-  }
-
-  if (typeof rec.createdAt !== "string" || !rec.createdAt.trim()) {
-    return xrpcErr(400, "InvalidParams");
-  }
-
-  const createdAtIso = new Date().toISOString();
-
-  let parsedUri: ReturnType<typeof parseAtUriParts>;
-  try {
-    parsedUri = parseAtUriParts(subject);
-  } catch {
-    return xrpcErr(400, "InvalidSubject");
-  }
-
-  if (parsedUri.collection !== NSID.listingDetail) {
-    return xrpcErr(400, "InvalidSubject");
-  }
-
-  const table = schema.storeListings;
-  const { listingPublicWhere } = directoryListingXrpcHelpers;
-
-  const [listing] = await db
-    .select({ id: table.id, atUri: table.atUri })
-    .from(table)
-    .where(listingPublicWhere(table, eq(table.atUri, subject)))
-    .limit(1);
-
-  if (!listing) {
-    return xrpcErr(404, "ListingNotFound");
-  }
-
-  const atUri = listing.atUri?.trim();
-  if (!atUri) {
-    return xrpcErr(400, "ListingNotOnNetwork");
-  }
-
-  const rev = schema.storeListingReviews;
-  const [existing] = await db
-    .select({ id: rev.id })
-    .from(rev)
-    .where(
-      and(eq(rev.storeListingId, listing.id), eq(rev.authorDid, session.did)),
-    )
-    .limit(1);
-
-  if (existing) {
-    return xrpcErr(409, "AlreadyReviewed");
-  }
-
-  await ensureReviewerProfileLikeFirstLogin(session);
-
-  const { uri, cid } = await createListingReviewRecord(
-    session.client,
-    session.did,
-    {
-      subject: atUri,
-      rating,
-      createdAt: createdAtIso,
-      text: typeof text === "string" ? text : undefined,
-    },
-  );
-
-  const { repo, rkey } = parseAtUriParts(uri);
-  if (repo !== session.did) {
-    return xrpcErr(500, "InvalidSubject", "Unexpected review record repo DID.");
-  }
-
-  const record: {
-    $type: typeof NSID.listingReview;
-    subject: string;
-    rating: number;
-    createdAt: string;
-    text?: string;
-  } = {
-    $type: NSID.listingReview,
-    subject: atUri,
-    rating,
-    createdAt: createdAtIso,
-  };
-  const trimmed = typeof text === "string" ? text.trim() : "";
-  if (trimmed) {
-    record.text = trimmed;
-  }
-
-  await upsertListingReviewFromTap({
-    db,
-    did: repo,
-    rkey,
-    record,
-  });
-
-  const [reviewRow] = await db
-    .select({ id: rev.id })
-    .from(rev)
-    .where(eq(rev.atUri, uri))
-    .limit(1);
-
-  if (!reviewRow) {
-    return xrpcErr(
-      500,
-      "InvalidSubject",
-      "Review was created but could not be mirrored locally.",
-    );
-  }
-
-  return xrpcJson({ uri, cid, reviewId: reviewRow.id });
-}
-
 export async function handleAtstoreXrpc(
   request: Request,
   nsid: string,
@@ -627,7 +451,7 @@ export async function handleAtstoreXrpc(
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
       },
@@ -671,13 +495,6 @@ export async function handleAtstoreXrpc(
           return xrpcErr(405, "MethodNotAllowed");
         }
         return handleListReviews(url, request);
-      }
-
-      case ATSTORE_XRPC_METHOD.reviewsSubmitReview: {
-        if (request.method !== "POST") {
-          return xrpcErr(405, "MethodNotAllowed");
-        }
-        return handleSubmitReview(request);
       }
 
       default: {

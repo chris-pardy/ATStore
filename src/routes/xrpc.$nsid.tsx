@@ -6,8 +6,6 @@ export const Route = createFileRoute("/xrpc/$nsid")({
     handlers: {
       GET: ({ request, params }) =>
         handleAtstoreXrpc(request, decodeURIComponent(params.nsid)),
-      POST: ({ request, params }) =>
-        handleAtstoreXrpc(request, decodeURIComponent(params.nsid)),
       OPTIONS: ({ request, params }) =>
         handleAtstoreXrpc(request, decodeURIComponent(params.nsid)),
     },
