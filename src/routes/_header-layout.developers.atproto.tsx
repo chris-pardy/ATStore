@@ -46,18 +46,18 @@ const METHOD_ROWS: ReadonlyArray<{
     nsid: ATSTORE_XRPC_METHOD.directoryGetListing,
     method: "GET",
     summary:
-      "Detail projection by `listingId` or `slug` (includes listing `atUri`).",
+      "Detail projection by listing.detail AT URI (`uri` query param); card uses `listing.uri`.",
   },
   {
     nsid: ATSTORE_XRPC_METHOD.directoryResolveListing,
     method: "GET",
-    summary: "Resolve `externalUrl` to listing identifiers.",
+    summary: "Resolve `externalUrl` to listing.detail AT URI (`uri`).",
   },
   {
     nsid: ATSTORE_XRPC_METHOD.reviewsListForListing,
     method: "GET",
     summary:
-      "Reviews for a listing (`listingId`, pagination); mirrored Tap index.",
+      "Reviews for a listing (`uri` listing.detail AT URI, pagination); mirrored Tap index.",
   },
 ];
 
@@ -176,7 +176,9 @@ function DevelopersAtprotoPage() {
             <span {...stylex.props(styles.monoTight)}>
               {ATSTORE_XRPC_METHOD.directoryGetListing}
             </span>{" "}
-            for the listing detail <Text weight="medium">atUri</Text>; use it as{" "}
+            with query param <Text weight="medium">uri</Text> (the
+            listing.detail AT URI); the JSON includes it as{" "}
+            <Text weight="medium">listing.uri</Text>. Use that value as{" "}
             <Text weight="medium">subject</Text> on a new{" "}
             <span {...stylex.props(styles.monoTight)}>
               {NSID.listingReview}

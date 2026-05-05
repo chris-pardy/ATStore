@@ -5,7 +5,7 @@
     "listingCardGet": {
       "type": "object",
       "required": [
-        "id",
+        "uri",
         "name",
         "tagline",
         "description",
@@ -17,14 +17,26 @@
         "categorySlugs"
       ],
       "properties": {
-        "id": { "type": "string", "maxLength": 64 },
+        "uri": {
+          "type": "string",
+          "format": "at-uri",
+          "maxLength": 2560,
+          "description": "AT URI of the fyi.atstore.listing.detail record."
+        },
         "name": { "type": "string", "maxLength": 640 },
-        "slug": { "type": "string", "maxLength": 640 },
         "tagline": { "type": "string", "maxLength": 2000 },
         "description": { "type": "string", "maxLength": 20000 },
         "iconUrl": { "type": "string", "maxLength": 8192, "nullable": true },
-        "heroImageUrl": { "type": "string", "maxLength": 8192, "nullable": true },
-        "categorySlug": { "type": "string", "maxLength": 512, "nullable": true },
+        "heroImageUrl": {
+          "type": "string",
+          "maxLength": 8192,
+          "nullable": true
+        },
+        "categorySlug": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
         "categorySlugs": {
           "type": "array",
           "items": { "type": "string", "maxLength": 512 }
@@ -42,7 +54,11 @@
         },
         "reviewCount": { "type": "integer" },
         "priceLabel": { "type": "string", "maxLength": 32 },
-        "productAccountHandle": { "type": "string", "maxLength": 512, "nullable": true },
+        "productAccountHandle": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
         "appTags": {
           "type": "array",
           "items": { "type": "string", "maxLength": 256 }
@@ -65,17 +81,32 @@
           "type": "ref",
           "ref": "#listingCardGet"
         },
-        "atUri": { "type": "string", "maxLength": 2560, "nullable": true },
         "isStoreManaged": { "type": "boolean" },
         "repoDid": { "type": "string", "maxLength": 2048, "nullable": true },
-        "productAccountDid": { "type": "string", "maxLength": 2048, "nullable": true },
-        "sourceTagline": { "type": "string", "maxLength": 20000, "nullable": true },
-        "sourceFullDescription": { "type": "string", "maxLength": 20000, "nullable": true },
+        "productAccountDid": {
+          "type": "string",
+          "maxLength": 2048,
+          "nullable": true
+        },
+        "sourceTagline": {
+          "type": "string",
+          "maxLength": 20000,
+          "nullable": true
+        },
+        "sourceFullDescription": {
+          "type": "string",
+          "maxLength": 20000,
+          "nullable": true
+        },
         "screenshots": {
           "type": "array",
           "items": { "type": "string", "maxLength": 4096 }
         },
-        "externalUrl": { "type": "string", "maxLength": 2048, "nullable": true },
+        "externalUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "nullable": true
+        },
         "sourceUrl": { "type": "string", "maxLength": 8192, "nullable": true },
         "createdAt": { "type": "string", "maxLength": 64, "nullable": true },
         "updatedAt": { "type": "string", "maxLength": 64, "nullable": true },
@@ -90,17 +121,16 @@
     },
     "main": {
       "type": "query",
-      "description": "Fetch one public verified listing by stable Postgres id (UUID) or by URL slug.",
+      "description": "Fetch one public verified listing by fyi.atstore.listing.detail AT URI.",
       "parameters": {
         "type": "params",
+        "required": ["uri"],
         "properties": {
-          "listingId": {
+          "uri": {
             "type": "string",
-            "maxLength": 64
-          },
-          "slug": {
-            "type": "string",
-            "maxLength": 640
+            "format": "at-uri",
+            "maxLength": 2560,
+            "description": "AT URI of the fyi.atstore.listing.detail record."
           }
         }
       },

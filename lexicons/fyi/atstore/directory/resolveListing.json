@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "query",
-      "description": "Resolve a storefront external URL to a directory listing when uniquely matched.",
+      "description": "Resolve a storefront external URL to a directory listing.detail AT URI when uniquely matched.",
       "parameters": {
         "type": "params",
         "required": ["externalUrl"],
@@ -20,11 +20,14 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["listingId", "slug"],
+          "required": ["uri"],
           "properties": {
-            "listingId": { "type": "string", "maxLength": 64 },
-            "slug": { "type": "string", "maxLength": 640 },
-            "atUri": { "type": "string", "maxLength": 2560, "nullable": true }
+            "uri": {
+              "type": "string",
+              "format": "at-uri",
+              "maxLength": 2560,
+              "description": "AT URI of the fyi.atstore.listing.detail record."
+            }
           }
         }
       },

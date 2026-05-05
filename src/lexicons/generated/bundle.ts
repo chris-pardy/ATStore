@@ -70,7 +70,7 @@ export const lexicons = [
       "listingCardGet": {
         "type": "object",
         "required": [
-          "id",
+          "uri",
           "name",
           "tagline",
           "description",
@@ -82,15 +82,13 @@ export const lexicons = [
           "categorySlugs"
         ],
         "properties": {
-          "id": {
+          "uri": {
             "type": "string",
-            "maxLength": 64
+            "format": "at-uri",
+            "maxLength": 2560,
+            "description": "AT URI of the fyi.atstore.listing.detail record."
           },
           "name": {
-            "type": "string",
-            "maxLength": 640
-          },
-          "slug": {
             "type": "string",
             "maxLength": 640
           },
@@ -191,11 +189,6 @@ export const lexicons = [
             "type": "ref",
             "ref": "#listingCardGet"
           },
-          "atUri": {
-            "type": "string",
-            "maxLength": 2560,
-            "nullable": true
-          },
           "isStoreManaged": {
             "type": "boolean"
           },
@@ -257,17 +250,18 @@ export const lexicons = [
       },
       "main": {
         "type": "query",
-        "description": "Fetch one public verified listing by stable Postgres id (UUID) or by URL slug.",
+        "description": "Fetch one public verified listing by fyi.atstore.listing.detail AT URI.",
         "parameters": {
           "type": "params",
+          "required": [
+            "uri"
+          ],
           "properties": {
-            "listingId": {
+            "uri": {
               "type": "string",
-              "maxLength": 64
-            },
-            "slug": {
-              "type": "string",
-              "maxLength": 640
+              "format": "at-uri",
+              "maxLength": 2560,
+              "description": "AT URI of the fyi.atstore.listing.detail record."
             }
           }
         },
@@ -295,7 +289,7 @@ export const lexicons = [
     "defs": {
       "main": {
         "type": "query",
-        "description": "Resolve a storefront external URL to a directory listing when uniquely matched.",
+        "description": "Resolve a storefront external URL to a directory listing.detail AT URI when uniquely matched.",
         "parameters": {
           "type": "params",
           "required": [
@@ -314,22 +308,14 @@ export const lexicons = [
           "schema": {
             "type": "object",
             "required": [
-              "listingId",
-              "slug"
+              "uri"
             ],
             "properties": {
-              "listingId": {
+              "uri": {
                 "type": "string",
-                "maxLength": 64
-              },
-              "slug": {
-                "type": "string",
-                "maxLength": 640
-              },
-              "atUri": {
-                "type": "string",
+                "format": "at-uri",
                 "maxLength": 2560,
-                "nullable": true
+                "description": "AT URI of the fyi.atstore.listing.detail record."
               }
             }
           }
@@ -352,7 +338,7 @@ export const lexicons = [
       "listingCardSearch": {
         "type": "object",
         "required": [
-          "id",
+          "uri",
           "name",
           "tagline",
           "description",
@@ -364,15 +350,13 @@ export const lexicons = [
           "categorySlugs"
         ],
         "properties": {
-          "id": {
+          "uri": {
             "type": "string",
-            "maxLength": 64
+            "format": "at-uri",
+            "maxLength": 2560,
+            "description": "AT URI of the fyi.atstore.listing.detail record."
           },
           "name": {
-            "type": "string",
-            "maxLength": 640
-          },
-          "slug": {
             "type": "string",
             "maxLength": 640
           },
@@ -448,7 +432,7 @@ export const lexicons = [
       },
       "main": {
         "type": "query",
-        "description": "Directory listing search and pagination.",
+        "description": "Directory listing search and pagination (verified listings with a listing.detail AT URI only).",
         "parameters": {
           "type": "params",
           "properties": {
@@ -891,12 +875,14 @@ export const lexicons = [
         "parameters": {
           "type": "params",
           "required": [
-            "listingId"
+            "uri"
           ],
           "properties": {
-            "listingId": {
+            "uri": {
               "type": "string",
-              "maxLength": 64
+              "format": "at-uri",
+              "maxLength": 2560,
+              "description": "AT URI of the fyi.atstore.listing.detail record."
             },
             "limit": {
               "type": "integer",
@@ -935,6 +921,9 @@ export const lexicons = [
         "errors": [
           {
             "name": "ListingNotFound"
+          },
+          {
+            "name": "InvalidParams"
           },
           {
             "name": "InvalidCursor"

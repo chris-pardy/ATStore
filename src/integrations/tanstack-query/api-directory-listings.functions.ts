@@ -77,6 +77,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   ne,
   or,
@@ -139,6 +140,18 @@ const storeListingLegacyDetailColumns = {
 function listingPublicWhere(table: typeof dbSchema.storeListings, extra?: SQL) {
   const pub = eq(table.verificationStatus, "verified");
   return extra ? and(pub, extra) : pub;
+}
+
+/** Verified public listings exposed over directory XRPC — must have a published listing.detail AT URI. */
+function listingXrpcPublicWhere(
+  table: typeof dbSchema.storeListings,
+  extra?: SQL,
+) {
+  const uriClause = and(
+    isNotNull(table.atUri),
+    sql`trim(${table.atUri}) <> ''`,
+  );
+  return listingPublicWhere(table, extra ? and(extra, uriClause) : uriClause);
 }
 
 function viewerMayReplyOnListingReview(opts: {
@@ -205,6 +218,7 @@ type DirectoryListingRow = {
   id: string;
   name: string;
   slug: string | null;
+  atUri: string | null;
   iconUrl: string | null;
   /** Dedicated hero/cover from `store_listings.hero_image_url` (Tap / publish). */
   heroImageUrl: string | null;
@@ -247,6 +261,14 @@ export interface DirectoryListingCard {
   /** Editorial app tags (e.g. developer tool, social). */
   appTags: Array<string>;
 }
+
+/** Listing card shape for directory XRPC responses (`uri` only — no store UUID/slug). */
+export type DirectoryListingCardXrpc = Omit<
+  DirectoryListingCard,
+  "id" | "slug"
+> & {
+  uri: string;
+};
 
 export interface DirectoryListingDetail extends DirectoryListingCard {
   /** Canonical AT URI for `fyi.atstore.listing.detail` when Tap-synced; needed to publish reviews. */
@@ -915,6 +937,16 @@ function toListingCard(row: DirectoryListingRow): DirectoryListingCard {
   };
 }
 
+function toListingCardXrpc(row: DirectoryListingRow): DirectoryListingCardXrpc {
+  const uri = row.atUri?.trim();
+  if (!uri) {
+    throw new Error("listingXrpcPublicWhere invariant violated: missing atUri");
+  }
+  const base = toListingCard(row);
+  const { id: _id, slug: _slug, ...rest } = base;
+  return { ...rest, uri };
+}
+
 type DirectoryListingDetailRow = DirectoryListingRow & {
   atUri: string | null;
   repoDid: string | null;
@@ -1434,6 +1466,7 @@ function getListingSelect(table: typeof dbSchema.storeListings) {
     id: table.id,
     name: table.name,
     slug: table.slug,
+    atUri: table.atUri,
     iconUrl: table.iconUrl,
     heroImageUrl: table.heroImageUrl,
     screenshotUrls: table.screenshotUrls,
@@ -6724,9 +6757,11 @@ const createStoreManagedListing = createServerFn({ method: "POST" })
 /** Server-only helpers shared with AT Store XRPC handlers. */
 export const directoryListingXrpcHelpers = {
   listingPublicWhere,
+  listingXrpcPublicWhere,
   getListingSelect,
   orderByPopularListingSort,
   toListingCard,
+  toListingCardXrpc,
   computeIsStoreManaged,
   viewerMayReplyOnListingReview,
   normalizeListingLinks,

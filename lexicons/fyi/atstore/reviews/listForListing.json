@@ -22,9 +22,21 @@
           "format": "datetime",
           "maxLength": 64
         },
-        "authorDisplayName": { "type": "string", "maxLength": 640, "nullable": true },
-        "authorHandle": { "type": "string", "maxLength": 512, "nullable": true },
-        "authorAvatarUrl": { "type": "string", "maxLength": 8192, "nullable": true },
+        "authorDisplayName": {
+          "type": "string",
+          "maxLength": 640,
+          "nullable": true
+        },
+        "authorHandle": {
+          "type": "string",
+          "maxLength": 512,
+          "nullable": true
+        },
+        "authorAvatarUrl": {
+          "type": "string",
+          "maxLength": 8192,
+          "nullable": true
+        },
         "replyCount": { "type": "integer" },
         "canReply": { "type": "boolean" }
       }
@@ -34,11 +46,13 @@
       "description": "List reviews for a directory listing (mirrored Tap data plus profile enrichment).",
       "parameters": {
         "type": "params",
-        "required": ["listingId"],
+        "required": ["uri"],
         "properties": {
-          "listingId": {
+          "uri": {
             "type": "string",
-            "maxLength": 64
+            "format": "at-uri",
+            "maxLength": 2560,
+            "description": "AT URI of the fyi.atstore.listing.detail record."
           },
           "limit": {
             "type": "integer",
@@ -58,7 +72,10 @@
           "type": "object",
           "required": ["reviews"],
           "properties": {
-            "cursor": { "type": "string", "maxLength": 512 },
+            "cursor": {
+              "type": "string",
+              "maxLength": 512
+            },
             "reviews": {
               "type": "array",
               "items": {
@@ -69,7 +86,11 @@
           }
         }
       },
-      "errors": [{ "name": "ListingNotFound" }, { "name": "InvalidCursor" }]
+      "errors": [
+        { "name": "ListingNotFound" },
+        { "name": "InvalidParams" },
+        { "name": "InvalidCursor" }
+      ]
     }
   }
 }

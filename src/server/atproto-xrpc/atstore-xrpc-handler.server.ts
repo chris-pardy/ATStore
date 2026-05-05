@@ -1,10 +1,11 @@
-import type { DirectoryListingCard } from "#/integrations/tanstack-query/api-directory-listings.functions";
+import type { DirectoryListingCardXrpc } from "#/integrations/tanstack-query/api-directory-listings.functions";
 import type { ListingLink } from "#/lib/atproto/listing-record";
 
 import { db } from "#/db/index.server";
 import * as schema from "#/db/schema";
 import { directoryListingXrpcHelpers } from "#/integrations/tanstack-query/api-directory-listings.functions";
-import { ATSTORE_XRPC_METHOD } from "#/lib/atproto/nsids";
+import { parseAtUriParts } from "#/lib/atproto/at-uri";
+import { ATSTORE_XRPC_METHOD, NSID } from "#/lib/atproto/nsids";
 import { fetchBlueskyPublicProfileFields } from "#/lib/bluesky-public-profile";
 import { getAtprotoSessionForRequest } from "#/middleware/auth";
 import { asc, desc, eq, ilike, or, sql } from "drizzle-orm";
@@ -62,16 +63,22 @@ function decodeOffsetCursor(cursor: string | null): number | undefined {
   }
 }
 
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value.trim(),
-  );
+function listingDetailUriOrNull(uriRaw: string): string | null {
+  const trimmed = uriRaw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const { collection } = parseAtUriParts(trimmed);
+    return collection === NSID.listingDetail ? trimmed : null;
+  } catch {
+    return null;
+  }
 }
 
-function listingCardJson(card: DirectoryListingCard) {
+function listingCardXrpcJson(card: DirectoryListingCardXrpc) {
   return {
     ...card,
-    slug: card.slug ?? "",
     rating:
       card.rating == null || Number.isNaN(Number(card.rating))
         ? null
@@ -128,10 +135,10 @@ async function handleSearchListings(url: URL) {
 
   const table = schema.storeListings;
   const {
-    listingPublicWhere,
+    listingXrpcPublicWhere,
     getListingSelect,
     orderByPopularListingSort,
-    toListingCard,
+    toListingCardXrpc,
   } = directoryListingXrpcHelpers;
 
   const searchClause = q
@@ -158,14 +165,16 @@ async function handleSearchListings(url: URL) {
   const rows = await db
     .select(listingSelect)
     .from(table)
-    .where(listingPublicWhere(table, searchClause))
+    .where(listingXrpcPublicWhere(table, searchClause))
     .orderBy(...orderBy)
     .offset(start)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
   const slice = hasMore ? rows.slice(0, limit) : rows;
-  const listings = slice.map((row) => listingCardJson(toListingCard(row)));
+  const listings = slice.map((row) =>
+    listingCardXrpcJson(toListingCardXrpc(row)),
+  );
 
   return xrpcJson({
     listings,
@@ -173,29 +182,16 @@ async function handleSearchListings(url: URL) {
   });
 }
 
-async function fetchVerifiedListingDetailRow(options: {
-  listingId?: string;
-  slug?: string;
-}) {
-  const listingId = options.listingId?.trim();
-  const slugOnly = options.slug?.trim();
-
-  if ((listingId && slugOnly) || (!listingId && !slugOnly)) {
+async function fetchVerifiedListingDetailRowByUri(uriRaw: string) {
+  const canonical = listingDetailUriOrNull(uriRaw);
+  if (!canonical) {
     return { error: "InvalidParams" as const };
   }
 
   const table = schema.storeListings;
-  const { listingPublicWhere } = directoryListingXrpcHelpers;
+  const { listingXrpcPublicWhere } = directoryListingXrpcHelpers;
 
-  let filter;
-  if (listingId) {
-    if (!isUuid(listingId)) {
-      return { error: "InvalidParams" as const };
-    }
-    filter = eq(table.id, listingId);
-  } else {
-    filter = eq(table.slug, slugOnly ?? "");
-  }
+  const filter = eq(table.atUri, canonical);
 
   const [row] = await db
     .select({
@@ -224,7 +220,7 @@ async function fetchVerifiedListingDetailRow(options: {
       updatedAt: table.updatedAt,
     })
     .from(table)
-    .where(listingPublicWhere(table, filter))
+    .where(listingXrpcPublicWhere(table, filter))
     .limit(1);
 
   if (!row) {
@@ -234,10 +230,8 @@ async function fetchVerifiedListingDetailRow(options: {
 }
 
 async function handleGetListing(url: URL) {
-  const listingId = url.searchParams.get("listingId") ?? undefined;
-  const slug = url.searchParams.get("slug") ?? undefined;
-
-  const fetched = await fetchVerifiedListingDetailRow({ listingId, slug });
+  const uriParam = url.searchParams.get("uri") ?? "";
+  const fetched = await fetchVerifiedListingDetailRowByUri(uriParam);
   if ("error" in fetched) {
     switch (fetched.error) {
       case "InvalidParams": {
@@ -252,11 +246,11 @@ async function handleGetListing(url: URL) {
     }
   }
 
-  const { toListingCard, computeIsStoreManaged, normalizeListingLinks } =
+  const { toListingCardXrpc, computeIsStoreManaged, normalizeListingLinks } =
     directoryListingXrpcHelpers;
 
   const row = fetched.row;
-  const listing = listingCardJson(toListingCard(row));
+  const listing = listingCardXrpcJson(toListingCardXrpc(row));
   const isStoreManaged = await computeIsStoreManaged(row);
 
   const linksRaw = normalizeListingLinks(
@@ -266,7 +260,6 @@ async function handleGetListing(url: URL) {
   return xrpcJson({
     listing,
     isStoreManaged,
-    atUri: row.atUri ?? null,
     repoDid: row.repoDid ?? null,
     productAccountDid: row.productAccountDid ?? null,
     sourceTagline: row.tagline ?? null,
@@ -295,7 +288,7 @@ async function handleResolveListing(url: URL) {
   }
 
   const table = schema.storeListings;
-  const { listingPublicWhere } = directoryListingXrpcHelpers;
+  const { listingXrpcPublicWhere } = directoryListingXrpcHelpers;
 
   const clause =
     variants.length === 1
@@ -311,12 +304,10 @@ async function handleResolveListing(url: URL) {
 
   const rows = await db
     .select({
-      id: table.id,
-      slug: table.slug,
       atUri: table.atUri,
     })
     .from(table)
-    .where(listingPublicWhere(table, clause))
+    .where(listingXrpcPublicWhere(table, clause))
     .limit(4);
 
   if (rows.length === 0) {
@@ -330,21 +321,20 @@ async function handleResolveListing(url: URL) {
   if (!hit) {
     return xrpcErr(404, "ListingNotFound");
   }
-  const slug = hit.slug?.trim();
-  if (!slug) {
+  const uri = hit.atUri?.trim();
+  if (!uri) {
     return xrpcErr(404, "ListingNotFound");
   }
 
   return xrpcJson({
-    listingId: hit.id,
-    slug,
-    atUri: hit.atUri ?? null,
+    uri,
   });
 }
 
 async function handleListReviews(url: URL, request: Request) {
-  const listingId = url.searchParams.get("listingId")?.trim();
-  if (!listingId || !isUuid(listingId)) {
+  const uriParam = url.searchParams.get("uri") ?? "";
+  const canonical = listingDetailUriOrNull(uriParam);
+  if (!canonical) {
     return xrpcErr(400, "InvalidParams");
   }
 
@@ -360,7 +350,7 @@ async function handleListReviews(url: URL, request: Request) {
   const start = offset ?? 0;
 
   const table = schema.storeListings;
-  const { listingPublicWhere, viewerMayReplyOnListingReview } =
+  const { listingXrpcPublicWhere, viewerMayReplyOnListingReview } =
     directoryListingXrpcHelpers;
 
   const [listing] = await db
@@ -370,7 +360,7 @@ async function handleListReviews(url: URL, request: Request) {
       productAccountDid: table.productAccountDid,
     })
     .from(table)
-    .where(listingPublicWhere(table, eq(table.id, listingId)))
+    .where(listingXrpcPublicWhere(table, eq(table.atUri, canonical)))
     .limit(1);
 
   if (!listing) {
